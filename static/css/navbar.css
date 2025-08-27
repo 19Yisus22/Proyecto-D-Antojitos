@@ -1,0 +1,71 @@
+.navbar {
+    background: linear-gradient(90deg, #fff8f0, #ffe6d1);
+    transition: background 0.5s ease, box-shadow 0.5s ease;
+}
+
+.navbar .navbar-brand {
+    font-size: 1.6rem;
+    color: #d35400;
+    transition: transform 0.3s ease, color 0.3s ease;
+}
+
+.navbar .navbar-brand img {
+    border-radius: 12px;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.navbar .navbar-brand:hover {
+    transform: scale(1.05);
+    color: #e67e22;
+}
+
+.navbar .navbar-brand img:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.navbar-nav .nav-link {
+    color: #d35400;
+    font-weight: 500;
+    margin-right: 0.5rem;
+    transition: color 0.3s ease, transform 0.3s ease;
+}
+
+.navbar-nav .nav-link:hover {
+    color: #e67e22;
+    transform: translateY(-2px);
+}
+
+.navbar-nav .dropdown-menu {
+    border-radius: 10px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.navbar-nav .dropdown-menu .dropdown-item {
+    transition: background 0.3s ease, color 0.3s ease;
+}
+
+.navbar-nav .dropdown-menu .dropdown-item:hover {
+    background: #ffe0c0;
+    color: #d35400;
+}
+
+.navbar-toggler {
+    border: none;
+    outline: none;
+    transition: transform 0.3s ease;
+}
+
+.navbar-toggler:hover {
+    transform: rotate(90deg);
+}
+
+.animate__fadeIn {
+    animation: fadeInDropdown 0.4s ease forwards;
+}
+
+@keyframes fadeInDropdown {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+}

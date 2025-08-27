@@ -1,0 +1,138 @@
+html, body {
+    height: 100%;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #fff8f0;
+    scroll-behavior: smooth;
+}
+
+main, .container-fluid, .container {
+    flex: 1;
+}
+
+h2 {
+    color: #d35400;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 2rem;
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+}
+
+.pedido-card {
+    border-radius: 12px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+    margin-bottom: 1rem;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    overflow: hidden;
+    background: #fff3e6;
+}
+
+.pedido-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.12);
+}
+
+.card-collapsed .card-body {
+    display: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.card-collapsed .card-header .toggle-detalle {
+    transform: rotate(0deg);
+    transition: transform 0.3s ease;
+}
+
+.card-header .toggle-detalle {
+    cursor: pointer;
+    transition: transform 0.3s ease;
+}
+
+.card-header .toggle-detalle:hover {
+    color: #d35400;
+    transform: rotate(90deg);
+}
+
+.card-body p, .card-body table {
+    transition: all 0.3s ease;
+}
+
+.estado-select, .btn {
+    transition: all 0.3s ease;
+}
+
+.estado-select:hover, .btn:hover {
+    transform: scale(1.03);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+}
+
+.table {
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    transition: transform 0.3s ease;
+}
+
+.table:hover {
+    transform: scale(1.01);
+}
+
+#toastContainer {
+    top: 1rem;
+    left: 1rem;
+    right: auto;
+    bottom: auto;
+    z-index: 1080;
+}
+
+.footer-container {
+    margin-top: auto;
+}
+
+.footer {
+    background-color: #000;
+    color: #fff;
+    padding: 20px 0;
+    flex-shrink: 0;
+}
+
+.footer h3, .footer h4, .footer h5, .footer p, .footer a, .footer .social-icon i {
+    color: #fff;
+}
+
+.footer a {
+    text-decoration: none;
+}
+
+.footer a:hover {
+    color: #ffd1dc;
+}
+
+.app-badge {
+    display: inline-block;
+    width: 3cm;
+    height: 3cm;
+}
+
+.footer-bottom {
+    border-top: 1px solid rgba(255,255,255,0.2);
+    padding-top: 10px;
+    font-size: 0.9rem;
+}
+
+
+.toast {
+    animation: slideIn 0.5s ease forwards;
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateX(-50px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+.table th, .table td {
+    vertical-align: middle !important;
+}

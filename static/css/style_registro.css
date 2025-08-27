@@ -1,0 +1,56 @@
+body {
+    background: linear-gradient(135deg, #f2dbdb, #ffe6e6);
+    color: #d6336c;
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.card {
+    width: 450px;
+    max-width: 90%;
+    padding: 2rem;
+    border-radius: 20px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+    background-color: #ffffff;
+    animation: slideIn 0.8s ease forwards;
+    text-align: center;
+}
+
+@keyframes slideIn {
+    0% { transform: translateY(-50px) scale(0.95); opacity: 0; }
+    100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+input.form-control {
+    transition: all 0.3s ease;
+}
+
+input.form-control:focus {
+    border-color: #d6336c;
+    box-shadow: 0 0 8px rgba(214,51,108,0.5);
+}
+
+button.btn-gradient {
+    background: linear-gradient(45deg,#ff6699,#ff3366);
+    border: none;
+    color: #fff;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+button.btn-gradient:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 15px rgba(214,51,108,0.4);
+}
+
+.logo-container img {
+    width: 60px;
+    height: 60px;
+    margin-bottom: 1rem;
+}

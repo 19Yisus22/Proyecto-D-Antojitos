@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sugerencias | D'Antojitos ©</title>
+<link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='uploads/logo.ico') }}">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style_comentarios.css') }}">
+</head>
+<body>
+
+{% include 'navbar.html' %}
+
+<main>
+    <div class="chat-container p-3">
+        <div id="chatBox" class="mb-3"></div>
+        <div class="d-flex flex-column">
+            <textarea id="mensajeInput" class="form-control" rows="3" placeholder="Danos tu opinión..."></textarea>
+            <button id="sendBtn" class="btn btn-primary w-100 mt-2">Enviar Sugerencia</button>
+        </div>
+    </div>
+</main>
+
+<div class="dropdown-actions" id="accionesDropdownContainer">
+    <ul class="dropdown-menu show" id="accionesDropdown"></ul>
+</div>
+
+<div id="toastContainer" class="position-fixed top-0 start-0 p-3"></div>
+
+<div class="footer-container mt-5">
+<footer class="footer py-4">
+<div class="container footer-content d-flex flex-wrap justify-content-between align-items-start">
+    <div class="footer-section">
+        <h3>Contáctanos</h3>
+        <div class="info-item"><i class="bi bi-person-fill"></i> Nombre: Teresa Rubio García</div>
+        <div class="info-item"><i class="bi bi-telephone-fill"></i> Teléfono / WhatsApp: +57 3115699825</div>
+        <div class="info-item"><i class="bi bi-envelope-fill"></i> Correo: terugag@hotmail.com</div>
+        <div class="info-item"><i class="bi bi-geo-alt-fill"></i> Dirección: Carrera 4 #14-38 Urb. La Catalana - Chinácota - N.S</div>
+        <div class="info-item"><i class="bi bi-clock-fill"></i> Horarios de atención: Jueves a Sábado, 9:00 AM - 6:00 PM</div>
+    </div>
+    <div class="footer-section">
+        <h5>Síganos en:</h5>
+        <a href="https://www.instagram.com/teresa.rubio.7311" class="social-icon text-light"><i class="bi bi-instagram"></i></a>
+    </div>
+    <div class="footer-section text-center">
+        <h4>D'Antojitos</h4>
+        <a href="/comentarios_page"><img src="{{ url_for('static', filename='uploads/logo.ico') }}" alt="Logo" class="app-badge"></a>
+    </div>
+</div>
+<div class="text-center mt-3 footer-bottom">
+    <p>© 2025 Reposteria D'Antojitos - Todos los derechos reservados</p>
+</div>
+</footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const chatBox = document.getElementById("chatBox");
+const sendBtn = document.getElementById("sendBtn");
+const mensajeInput = document.getElementById("mensajeInput");
+const toastContainer = document.getElementById('toastContainer');
+const accionesContainer = document.getElementById('accionesDropdownContainer');
+const accionesDropdown = document.getElementById('accionesDropdown');
+let comentarioAbierto = null;
+let editandoComentario = null;
+
+const usuario = {id_usuario: "{{ user_id }}"};
+
+function showMessage(msg, isError=false){
+    const toastEl = document.createElement('div');
+    toastEl.className = 'toast align-items-center text-bg-light border-0';
+    toastEl.setAttribute('role','alert');
+    toastEl.setAttribute('aria-live','assertive');
+    toastEl.setAttribute('aria-atomic','true');
+    toastEl.innerHTML = `<div class="d-flex"><div class="toast-body">${isError?'❌':'✅'} ${msg}</div>
+        <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div>`;
+    toastContainer.appendChild(toastEl);
+    new bootstrap.Toast(toastEl,{delay:800}).show();
+}
+
+function bloquearAcciones(){
+    document.querySelectorAll("button, input, textarea").forEach(el => el.disabled = true);
+}
+
+function renderComentario(c){
+    const div = document.createElement("div");
+    div.classList.add("message");
+    div.dataset.id = c.id;
+    div.dataset.usuario = c.id_usuario;
+    const fotoPerfil = c.usuario_info?.foto_perfil;
+    const nombreUsuario = c.usuario_info?.nombre_usuario || 'Usuario';
+    let imgHtml = '';
+    if(fotoPerfil){
+        imgHtml = `<img src="${fotoPerfil}" alt="perfil" class="rounded-circle me-2" style="width:40px;height:40px;object-fit:cover;">`;
+    }
+    div.innerHTML = `
+        <div class="d-flex align-items-start">
+            ${imgHtml}
+            <div class="message-content flex-grow-1">
+                <div class="message-header d-flex justify-content-between">
+                    <span class="username fw-bold">${nombreUsuario}</span>
+                    <span class="time text-muted small" style="margin-left:4px;">
+                        ${new Date(c.created_at).toLocaleString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}
+                    </span>
+                </div>
+                <div class="mensaje-texto">${c.mensaje}</div>
+            </div>
+        </div>
+    `;
+    if(c.id_usuario === usuario.id_usuario){
+        const dots = document.createElement("i");
+        dots.className = "bi bi-three-dots-vertical fw-bold";
+        dots.style.cursor = "pointer";
+        dots.style.position = "absolute";
+        dots.style.top = "10px";
+        dots.style.right = "10px";
+        dots.style.fontSize = "1.5rem";
+        dots.addEventListener("click", (e)=>{
+            e.stopPropagation();
+            if(comentarioAbierto === c.id){
+                accionesContainer.style.display = "none";
+                comentarioAbierto = null;
+                return;
+            }
+            accionesDropdown.innerHTML = `<li><a class="dropdown-item" href="#" onclick="iniciarEdicion('${c.id}','${c.mensaje.replace(/'/g,"\\'")}')">✏️ Editar</a></li>
+                <li><a class="dropdown-item" href="#" onclick="eliminarComentario('${c.id}')">🗑️ Eliminar</a></li>`;
+            const rect = e.target.getBoundingClientRect();
+            accionesContainer.style.top = `${rect.bottom + window.scrollY}px`;
+            accionesContainer.style.left = `${rect.left + window.scrollX}px`;
+            accionesContainer.style.display = "block";
+            comentarioAbierto = c.id;
+        });
+        div.appendChild(dots);
+    }
+    return div;
+}
+
+async function cargarComentarios(){
+    try{
+        const res = await fetch("/comentarios");
+        if(res.status===401 || res.status===403){
+            showMessage("Inicie Sesión para ver comentarios", true);
+            bloquearAcciones();
+            return;
+        }
+        const data = await res.json();
+        chatBox.innerHTML = "";
+        data.forEach(c => chatBox.appendChild(renderComentario(c)));
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }catch(error){
+        showMessage("Error al cargar comentarios",true);
+    }
+}
+
+function iniciarEdicion(id,mensaje){
+    mensajeInput.value = mensaje;
+    editandoComentario = id;
+    accionesContainer.style.display = "none";
+    comentarioAbierto = null;
+    sendBtn.textContent = "Guardar Cambios";
+    mensajeInput.focus();
+}
+
+sendBtn.addEventListener("click", async()=>{
+    const mensaje = mensajeInput.value.trim();
+    if(!mensaje) return;
+    try{
+        if(editandoComentario){
+            const res = await fetch(`/comentarios/${editandoComentario}`,{
+                method:"PUT",
+                headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({mensaje})
+            });
+            if(res.ok) showMessage("Comentario Editado");
+            editandoComentario = null;
+            sendBtn.textContent = "Enviar Sugerencia";
+        } else {
+            const res = await fetch("/comentarios",{
+                method:"POST",
+                headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({mensaje})
+            });
+            if(res.ok) showMessage("Comentario Publicado");
+        }
+        mensajeInput.value = "";
+        cargarComentarios();
+    }catch(error){
+        showMessage("Error enviando comentario",true);
+    }
+});
+
+async function eliminarComentario(id){
+    try{
+        const res = await fetch(`/comentarios/${id}`,{method:"DELETE"});
+        if(res.ok){
+            showMessage("Comentario eliminado");
+            cargarComentarios();
+        }
+    }catch(error){
+        showMessage("Error eliminando comentario",true);
+    }
+}
+
+document.addEventListener("click",(e)=>{
+    if(!accionesContainer.contains(e.target) && !e.target.closest(".bi-three-dots-vertical")){
+        accionesContainer.style.display = "none";
+        comentarioAbierto = null;
+    }
+});
+
+cargarComentarios();
+</script>
+</body>
+</html>

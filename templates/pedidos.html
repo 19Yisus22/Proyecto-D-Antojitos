@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pedidos | D'Antojitos ©</title>
+<link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='uploads/logo.ico') }}">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style_pedido.css') }}">
+<style>
+.pedido-card.seleccion { border: 2px solid red; }
+</style>
+</head>
+<body>
+
+{% include 'navbar.html' %}
+
+<div class="container mt-4">
+  <h2 class="mb-4 text-center">Pedidos</h2>
+  <div class="d-flex gap-2 mb-3">
+    <input type="text" id="buscarCliente" class="form-control" placeholder="Buscar por nombre del cliente">
+    <select id="filtroEstado" class="form-select w-auto">
+      <option value="Todos">Todos</option>
+      <option value="Pendiente">Pendientes</option>
+      <option value="Entregado">Entregados</option>
+      <option value="Cancelado">Cancelados</option>
+      <option value="Terminados">Terminados</option>
+    </select>
+    <button id="eliminarSeleccionados" class="btn btn-danger">Borrar Seleccionados</button>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-bordered">
+      <thead>
+        <tr>
+          <th id="tituloTabla">Pedidos</th>
+        </tr>
+      </thead>
+      <tbody id="tablaPedidos"></tbody>
+    </table>
+  </div>
+  <nav><ul id="pagination" class="pagination justify-content-center"></ul></nav>
+</div>
+
+<div id="toastContainer" class="position-fixed p-3 top-0 end-0"></div>
+
+<div class="footer-container mt-5">
+<footer class="footer py-4">
+<div class="container footer-content d-flex flex-wrap justify-content-between align-items-start">
+    <div class="footer-section">
+        <h3>Contáctanos</h3>
+        <div class="info-item"><i class="bi bi-person-fill"></i> Nombre: Teresa Rubio García</div>
+        <div class="info-item"><i class="bi bi-telephone-fill"></i> Teléfono / WhatsApp: +57 3115699825</div>
+        <div class="info-item"><i class="bi bi-envelope-fill"></i> Correo: terugag@hotmail.com</div>
+        <div class="info-item"><i class="bi bi-geo-alt-fill"></i> Dirección: Carrera 4 #14-38 Urb. La Catalana - Chinácota - N.S</div>
+        <div class="info-item"><i class="bi bi-clock-fill"></i> Horarios de atención: Jueves a Sábado, 9:00 AM - 6:00 PM</div>
+    </div>
+    <div class="footer-section">
+        <h5>Síganos en:</h5>
+        <a href="https://www.instagram.com/teresa.rubio.7311?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==" class="social-icon text-light"><i class="bi bi-instagram"></i></a>
+    </div>
+    <div class="footer-section text-center">
+        <h4>D'Antojitos</h4>
+        <a href="/pedidos_page"><img src="{{ url_for('static', filename='uploads/logo.ico') }}" alt="Logo" class="app-badge"></a>
+    </div>
+</div>
+<div class="text-center mt-3 footer-bottom">
+    <p>© 2025 Reposteria D'Antojitos - Todos los derechos reservados</p>
+</div>
+</footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const toastContainer = document.getElementById('toastContainer');
+const itemsPorPagina = 5;
+let pedidosGlobal = [];
+let pedidosFiltrados = [];
+
+function showMessage(msg, isError=false){
+  const toastEl = document.createElement('div');
+  toastEl.className = 'toast align-items-center text-bg-light border-0';
+  toastEl.setAttribute('role','alert');
+  toastEl.setAttribute('aria-live','assertive');
+  toastEl.setAttribute('aria-atomic','true');
+  toastEl.innerHTML = `<div class="d-flex">
+    <div class="toast-body">${isError ? '❌' : '✅'} ${msg}</div>
+    <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast"></button>
+  </div>`;
+  toastContainer.appendChild(toastEl);
+  new bootstrap.Toast(toastEl,{delay:1200}).show();
+}
+
+function renderizarPaginacion(lista){
+  const totalPaginas = Math.ceil(lista.length / itemsPorPagina);
+  const pagUl = document.getElementById("pagination");
+  pagUl.innerHTML = "";
+  for(let i=1;i<=totalPaginas;i++){
+    const li = document.createElement("li");
+    li.className = "page-item";
+    li.innerHTML = `<a class="page-link" href="#">${i}</a>`;
+    li.addEventListener("click",(e)=>{ e.preventDefault(); mostrarPagina(lista,i); });
+    pagUl.appendChild(li);
+  }
+  actualizarTituloTabla();
+  mostrarPagina(lista,1);
+}
+
+function mostrarPagina(lista,pagina){
+  const cont = document.getElementById("tablaPedidos");
+  cont.innerHTML = "";
+  const inicio = (pagina-1)*itemsPorPagina;
+  const fin = inicio + itemsPorPagina;
+  lista.slice(inicio,fin).forEach(card=>{
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.appendChild(card);
+    tr.appendChild(td);
+    cont.appendChild(tr);
+  });
+}
+
+function actualizarTituloTabla(){
+  const titulo = document.getElementById("tituloTabla");
+  const filtro = document.getElementById("filtroEstado").value;
+  if(filtro==="Todos") titulo.textContent="Pedidos";
+  else if(filtro==="Terminados") titulo.textContent="Pedidos Terminados";
+  else titulo.textContent=`Pedidos ${filtro}`;
+}
+
+async function cargarPedidos(){
+  const res = await fetch("/obtener_pedidos");
+  const pedidos = await res.json();
+  if(!Array.isArray(pedidos)) return;
+  pedidosGlobal = pedidos.map(pedido=>{
+    const card = document.createElement("div");
+    card.className="pedido-card card-collapsed col-12 mb-2 p-2";
+    card.dataset.cliente=(pedido.cliente||'desconocido').toLowerCase();
+    card.dataset.estado=pedido.estado;
+    card.dataset.pagado=pedido.pagado;
+    card.id=`pedido-${pedido.id_pedido}`;
+    card.innerHTML = `
+      <div class="card ${pedido.estado==='Cancelado'||(pedido.estado==='Entregado'&&pedido.pagado)?'gris':''}">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><strong>Pedido #${pedido.id_pedido}</strong> - Estado: ${pedido.estado} - ${pedido.pagado?'Pagado':'No Pagado'}</span>
+          <div class="d-flex gap-2">
+            <i class="bi bi-chevron-down icono fs-4 toggle-detalle"></i>
+            <i class="bi bi-trash icono text-danger fs-4" onclick="this.closest('.pedido-card').classList.toggle('seleccion');"></i>
+          </div>
+        </div>
+        <div class="card-body">
+          <p><strong>Cliente:</strong> ${pedido.cliente||'Desconocido'}</p>
+          <p><strong>Cédula:</strong> ${pedido.cedula||'No registrada'}</p>
+          <p><strong>Dirección:</strong> ${pedido.direccion_entrega||'No registrada'}</p>
+          <p><strong>Método de Pago:</strong> ${pedido.metodo_pago||'No especificado'}</p>
+          <table class="table table-sm mt-2">
+            <thead><tr><th>Nombre Producto</th><th>Cantidad</th><th>Total</th><th>Pago</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>${pedido.nombre_producto}</td>
+                <td>${pedido.cantidad}</td>
+                <td>${pedido.total.toLocaleString('es-CO',{style:'currency',currency:'COP'})}</td>
+                <td class="text-center">
+                  <i class="bi ${pedido.pagado?'bi-check-circle text-success':'bi-x-circle text-danger'} fs-3" 
+                     onclick="togglePago('${pedido.id_pedido}', this, ${pedido.pagado})"></i>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="mt-3">
+            <select class="form-select estado-select">
+              <option value="Pendiente" ${pedido.estado==='Pendiente'?'selected':''}>Pendiente</option>
+              <option value="Entregado" ${pedido.estado==='Entregado'?'selected':''}>Entregado</option>
+              <option value="Cancelado" ${pedido.estado==='Cancelado'?'selected':''}>Cancelado</option>
+            </select>
+            <button class="btn btn-primary btn-sm mt-2 actualizar-btn">Actualizar Estado</button>
+          </div>
+        </div>
+      </div>`;
+    card.querySelector(".toggle-detalle").addEventListener("click",()=>card.classList.toggle("card-collapsed"));
+    card.querySelector(".actualizar-btn").addEventListener("click",async()=>{
+      const nuevo_estado=card.querySelector(".estado-select").value;
+      await fetch(`/actualizar_estado/${pedido.id_pedido}`,{
+        method:"PUT",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({estado:nuevo_estado})
+      });
+      showMessage(`Estado del pedido #${pedido.id_pedido} actualizado a ${nuevo_estado}`);
+      card.dataset.estado=nuevo_estado;
+      aplicarFiltros();
+    });
+    return card;
+  });
+  pedidosFiltrados=[...pedidosGlobal];
+  aplicarFiltros();
+}
+
+function togglePago(id_pedido, btn, estadoActual){
+  const nuevoPago = !estadoActual;
+  fetch(`/actualizar_pago/${id_pedido}`,{
+    method:'PUT',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({pagado:nuevoPago})
+  })
+  .then(res=>res.json()).then(data=>{
+    if(data.ok){
+      btn.classList.toggle('bi-check-circle',nuevoPago);
+      btn.classList.toggle('bi-x-circle',!nuevoPago);
+      btn.classList.toggle('text-success',nuevoPago);
+      btn.classList.toggle('text-danger',!nuevoPago);
+      btn.setAttribute('onclick', `togglePago('${id_pedido}', this, ${nuevoPago})`);
+      showMessage(`Pago del pedido #${id_pedido} actualizado a ${nuevoPago?'Pagado':'No Pagado'}`);
+      aplicarFiltros();
+    }
+  });
+}
+
+document.getElementById("buscarCliente").addEventListener("input", aplicarFiltros);
+document.getElementById("filtroEstado").addEventListener("change", aplicarFiltros);
+document.getElementById("eliminarSeleccionados").addEventListener("click",async()=>{
+  const seleccionados=document.querySelectorAll(".pedido-card.seleccion");
+  if(seleccionados.length===0){ showMessage("No hay pedidos seleccionados",true); return; }
+  for(const card of seleccionados){
+    const idPedido=card.id.replace("pedido-","");
+    await fetch(`/eliminar_pedido/${idPedido}`,{method:"DELETE"});
+    card.remove();
+  }
+  pedidosGlobal=pedidosGlobal.filter(c=>!c.classList.contains("seleccion"));
+  pedidosFiltrados=pedidosFiltrados.filter(c=>!c.classList.contains("seleccion"));
+  aplicarFiltros();
+  showMessage("Pedidos Eliminados");
+});
+
+function aplicarFiltros(){
+  const val=document.getElementById("buscarCliente").value.toLowerCase();
+  const estado=document.getElementById("filtroEstado").value;
+  pedidosFiltrados=pedidosGlobal.filter(card=>{
+    const matchesCliente=card.dataset.cliente.includes(val);
+    let matchesEstado=true;
+    if(estado==="Terminados"){ matchesEstado=card.dataset.estado==="Entregado" && card.dataset.pagado==="true"; }
+    else if(estado!=="Todos"){ matchesEstado=card.dataset.estado===estado; }
+    return matchesCliente && matchesEstado;
+  });
+  renderizarPaginacion(pedidosFiltrados);
+}
+
+cargarPedidos();
+</script>
+</body>
+</html>
