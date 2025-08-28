@@ -102,7 +102,10 @@ def login_usuario(correo, contrasena):
     if not res.data:
         return None
     user = res.data[0]
-    valido = pwd_context.verify(contrasena, user["contrasena"]) if user["contrasena"].startswith("$2b$") else contrasena == user["contrasena"]
+    try:
+        valido = pwd_context.verify(contrasena, user["contrasena"])
+    except Exception:
+        valido = contrasena == user["contrasena"]
     return user if valido else None
 
 @app.route("/login", methods=["GET", "POST"])
@@ -119,14 +122,17 @@ def login():
     if not res.data:
         return jsonify({"ok": False, "error": "Correo o contraseña incorrectos"}), 401
     user = res.data[0]
-    valido = pwd_context.verify(contrasena, user["contrasena"]) if user["contrasena"].startswith("$2b$") else contrasena == user["contrasena"]
+    try:
+        valido = pwd_context.verify(contrasena, user["contrasena"])
+    except Exception:
+        valido = contrasena == user["contrasena"]
     if not valido:
         return jsonify({"ok": False, "error": "Correo o contraseña incorrectos"}), 401
     permisos_res = supabase.table("roles_permisos").select("permisos(nombre_permiso)").eq("id_role", user["id_role"]).execute()
     permisos = [p["permisos"]["nombre_permiso"] for p in permisos_res.data if p.get("permisos")]
     session["user_id"], session["rol"], session["permisos"], session["just_logged_in"] = user["id_cliente"], user["roles"]["nombre_role"], permisos, True
     return jsonify({"ok": True, "redirect": "/inicio", "user": user, "permisos": permisos}), 200
-
+ 
 @app.route("/inicio")
 def inicio():
     user, just_logged_in, pedidos_nuevos = None, False, False
