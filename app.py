@@ -2,6 +2,7 @@ import os
 import socket
 import secrets
 import logging
+import hashlib
 import websockets
 import cloudinary
 import cloudinary.uploader
@@ -9,7 +10,6 @@ from waitress import serve
 from flask_cors import CORS
 from dotenv import load_dotenv
 from supabase import create_client
-from passlib.context import CryptContext
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 
 # RUTAS Y DIRECTORIOS
@@ -57,9 +57,6 @@ UPLOAD_FOLDER = 'uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'ico'}
 
-# HASHING DE CONTRASEÑAS
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 def allowed_file(filename):
     ext = filename.rsplit(".", 1)[1].lower() if "." in filename else ""
     return ext in ALLOWED_EXTENSIONS
@@ -85,6 +82,27 @@ def delete_image_from_cloudinary(public_url):
     except:
         return False
 
+def hash_password(contrasena, salt=None):
+    if not salt:
+        salt = os.urandom(16).hex()
+    hashed = hashlib.sha256((salt + contrasena).encode()).hexdigest()
+    return f"{salt}${hashed}"
+
+def verify_password(contrasena, hashed):
+    salt, hash_val = hashed.split("$")
+    return hashlib.sha256((salt + contrasena).encode()).hexdigest() == hash_val
+
+def login_usuario(correo, contrasena):
+    res = supabase.table("usuarios").select(
+        "*, roles(nombre_role), roles_permisos(permisos(nombre_permiso))"
+    ).eq("correo", correo).execute()
+    if not res.data:
+        return None
+    user = res.data[0]
+    if not verify_password(contrasena, user["contrasena"]):
+        return None
+    return user
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
@@ -97,75 +115,57 @@ def index():
         return render_template("inicio.html", mensaje="Extensión de archivo no permitida")
     return render_template("inicio.html")
 
-def login_usuario(correo, contrasena):
-    res = supabase.table("usuarios").select("*, roles(nombre_role), roles_permisos(permisos(nombre_permiso))").eq("correo", correo).execute()
-    if not res.data:
-        return None
-    user = res.data[0]
-    try:
-        valido = pwd_context.verify(contrasena, user["contrasena"])
-    except Exception:
-        valido = contrasena == user["contrasena"]
-    return user if valido else None
-
-app.route("/login", methods=["GET", "POST"])
+@app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "GET":
         return render_template("login.html")
     if not request.is_json:
         return jsonify({"ok": False, "error": "Content-Type application/json requerido"}), 415
     data = request.get_json()
-    correo = data.get("correo", "").strip().lower()
-    contrasena = data.get("contrasena", "")
+    correo, contrasena = data.get("correo", "").strip().lower(), data.get("contrasena", "")
     if not correo or not contrasena:
         return jsonify({"ok": False, "error": "Debes ingresar correo y contraseña"}), 400
-    res = supabase.table("usuarios").select("*, roles(nombre_role)").eq("correo", correo).maybe_single().execute()
-    user = res.data
-    if not user:
+    res = supabase.table("usuarios").select("*, roles(nombre_role)").eq("correo", correo).execute()
+    if not res.data:
         return jsonify({"ok": False, "error": "Correo o contraseña incorrectos"}), 401
-    valido = pwd_context.verify(contrasena, user.get("contrasena") or "")
-    if not valido:
+    user = res.data[0]
+    if not verify_password(contrasena, user["contrasena"]):
         return jsonify({"ok": False, "error": "Correo o contraseña incorrectos"}), 401
-    permisos_res = supabase.table("roles_permisos").select("permisos(nombre_permiso)").eq("id_role", user["roles"]["id_role"]).execute()
+    permisos_res = supabase.table("roles_permisos").select("permisos(nombre_permiso)").eq("id_role", user["id_role"]).execute()
     permisos = [p["permisos"]["nombre_permiso"] for p in permisos_res.data if p.get("permisos")]
-    session["user_id"] = user["id_cliente"]
-    session["rol"] = user["roles"]["nombre_role"]
-    session["permisos"] = permisos
-    session["just_logged_in"] = True
+    session["user_id"], session["rol"], session["permisos"], session["just_logged_in"] = user["id_cliente"], user["roles"]["nombre_role"], permisos, True
     return jsonify({"ok": True, "redirect": "/inicio", "user": user, "permisos": permisos}), 200
 
 @app.route("/inicio")
 def inicio():
-    user = None
-    just_logged_in = False
-    pedidos_nuevos = False
+    user, just_logged_in, pedidos_nuevos = None, False, False
     user_id = session.get("user_id")
-    if user_id:
-        res = supabase.table("usuarios").select("*, roles(nombre_role)").eq("id_cliente", user_id).maybe_single().execute()
-        user = res.data if res.data else None
-        if user:
-            if not user.get("imagen_url"):
-                user["imagen_url"] = "https://res.cloudinary.com/dmknjcrua/image/upload/v1755983018/defaults/default_icon_profile.png"
-            just_logged_in = session.pop("just_logged_in", False)
-            permisos_res = supabase.table("roles_permisos").select("permisos(nombre_permiso)").eq("id_role", user["roles"]["id_role"]).execute()
-            user["permisos"] = [p["permisos"]["nombre_permiso"] for p in permisos_res.data if p.get("permisos")]
-            session["permisos"] = user["permisos"]
-            if user["roles"]["nombre_role"] == "admin" and "ver_pedidos" in user["permisos"]:
-                pedidos_res = supabase.table("pedidos").select("*").eq("estado", "nuevo").execute()
-                pedidos_nuevos = bool(pedidos_res.data) if pedidos_res.data else False
-        else:
-            session.clear()
-    else:
+
+    if not user_id:
         session.clear()
+        return render_template("inicio.html", user=None, just_logged_in=False, pedidos_nuevos=False)
+
+    res = supabase.table("usuarios").select("*, roles(nombre_role)").eq("id_cliente", user_id).maybe_single().execute()
+    if not res.data:
+        session.clear()
+        return render_template("inicio.html", user=None, just_logged_in=False, pedidos_nuevos=False)
+
+    user = res.data
+
+    if not user.get("imagen_url"):
+        user["imagen_url"] = "https://res.cloudinary.com/dmknjcrua/image/upload/v1755983018/defaults/default_icon_profile.png"
+
+    just_logged_in = session.pop("just_logged_in", False)
+
+    permisos_res = supabase.table("roles_permisos").select("permisos(nombre_permiso)").eq("id_role", user.get("id_role")).execute()
+    user["permisos"] = [p["permisos"]["nombre_permiso"] for p in permisos_res.data if p.get("permisos")]
+    session["permisos"] = user["permisos"]
+
+    if user.get("roles", {}).get("nombre_role") == "admin" and "ver_pedidos" in user["permisos"]:
+        pedidos_res = supabase.table("pedidos").select("*").eq("estado", "nuevo").execute()
+        pedidos_nuevos = bool(pedidos_res.data) if pedidos_res.data else False
+
     return render_template("inicio.html", user=user, just_logged_in=just_logged_in, pedidos_nuevos=pedidos_nuevos)
-
-@app.route("/logout", methods=["POST"])
-def logout():
-    session.clear()
-    return jsonify({"success": True})
-
-from passlib.context import CryptContext
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 @app.route("/registro", methods=["GET", "POST", "OPTIONS"])
 def registro():
@@ -175,21 +175,19 @@ def registro():
         return render_template("registro.html")
     if not request.is_json:
         return jsonify({"ok": False, "error": "Content-Type application/json requerido"}), 415
-
     payload = request.get_json()
-    cedula = payload.get("cedula", "").strip()
-    nombre = payload.get("nombre", "").strip()
-    apellido = payload.get("apellido", "").strip()
-    telefono = payload.get("telefono", "").strip()
-    correo = payload.get("correo", "").strip().lower()
-    contrasena = payload.get("contrasena", "")
-
+    cedula, nombre, apellido, telefono, correo, contrasena = (
+        payload.get("cedula", "").strip(),
+        payload.get("nombre", "").strip(),
+        payload.get("apellido", "").strip(),
+        payload.get("telefono", "").strip(),
+        payload.get("correo", "").strip().lower(),
+        payload.get("contrasena", "")
+    )
     if not all([cedula, nombre, apellido, correo, contrasena]):
         return jsonify({"ok": False, "error": "Todos los campos son obligatorios"}), 400
-
-    hashed = pwd_context.hash(contrasena)
+    hashed = hash_password(contrasena)
     default_img = "static/uploads/default_icon_profile.png"
-
     try:
         res = supabase.table("usuarios").insert({
             "cedula": cedula,
@@ -201,14 +199,17 @@ def registro():
             "metodo_pago": "Efectivo",
             "imagen_url": default_img
         }).execute()
-
         if not res.data:
             return jsonify({"ok": False, "error": "No se pudo registrar el usuario"}), 400
-
-        return jsonify({"ok": True, "mensaje": "✅ Usuario registrado exitosamente"}), 201
+        return jsonify({"ok": True, "mensaje": "Usuario Registrado"}), 201
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 400
-   
+    
+@app.route("/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return jsonify({"success": True})
+
 # APARTADO DE PERFILES
 
 @app.route("/mi_perfil", methods=["GET", "POST"])
@@ -301,14 +302,15 @@ def listar_usuarios():
 def cambiar_contrasena():
     user_id = session.get("user_id")
     if not user_id:
-        return jsonify({"ok": False,"error": "No autorizado"}), 401
+        return jsonify({"ok": False, "error": "No autorizado"}), 401
 
     data = request.get_json()
-    nueva = data.get("nueva","").strip()
+    nueva = data.get("nueva", "").strip()
     if not nueva:
-        return jsonify({"ok": False,"error": "Contraseña requerida"}), 400
+        return jsonify({"ok": False, "error": "Contraseña requerida"}), 400
 
-    supabase.table("usuarios").update({"contrasena": nueva}).eq("id_cliente", user_id).execute()
+    hashed = hash_password(nueva)
+    supabase.table("usuarios").update({"contrasena": hashed}).eq("id_cliente", user_id).execute()
     return jsonify({"ok": True})
 
 @app.route("/eliminar_usuario_por_correo", methods=["DELETE"])
