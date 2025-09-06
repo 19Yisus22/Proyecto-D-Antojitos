@@ -1,7 +1,9 @@
 import os
+import uuid
 import socket
 import secrets
 import logging
+import hashlib
 import websockets
 import cloudinary
 import cloudinary.uploader
@@ -9,7 +11,6 @@ from waitress import serve
 from flask_cors import CORS
 from dotenv import load_dotenv
 from supabase import create_client
-from passlib.context import CryptContext
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 
 # RUTAS Y DIRECTORIOS
@@ -57,9 +58,6 @@ UPLOAD_FOLDER = 'uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'ico'}
 
-# HASHING DE CONTRASEÑAS
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 def allowed_file(filename):
     ext = filename.rsplit(".", 1)[1].lower() if "." in filename else ""
     return ext in ALLOWED_EXTENSIONS
@@ -85,6 +83,27 @@ def delete_image_from_cloudinary(public_url):
     except:
         return False
 
+def hash_password(contrasena, salt=None):
+    if not salt:
+        salt = os.urandom(16).hex()
+    hashed = hashlib.sha256((salt + contrasena).encode()).hexdigest()
+    return f"{salt}${hashed}"
+
+def verify_password(contrasena, hashed):
+    salt, hash_val = hashed.split("$")
+    return hashlib.sha256((salt + contrasena).encode()).hexdigest() == hash_val
+
+def login_usuario(correo, contrasena):
+    res = supabase.table("usuarios").select(
+        "*, roles(nombre_role), roles_permisos(permisos(nombre_permiso))"
+    ).eq("correo", correo).execute()
+    if not res.data:
+        return None
+    user = res.data[0]
+    if not verify_password(contrasena, user["contrasena"]):
+        return None
+    return user
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
@@ -96,14 +115,6 @@ def index():
             return render_template("inicio.html", mensaje="Archivo subido correctamente", url_imagen=url_imagen)
         return render_template("inicio.html", mensaje="Extensión de archivo no permitida")
     return render_template("inicio.html")
-
-def login_usuario(correo, contrasena):
-    res = supabase.table("usuarios").select("*, roles(nombre_role), roles_permisos(permisos(nombre_permiso))").eq("correo", correo).execute()
-    if not res.data:
-        return None
-    user = res.data[0]
-    valido = pwd_context.verify(contrasena, user["contrasena"]) if user["contrasena"].startswith("$2b$") else contrasena == user["contrasena"]
-    return user if valido else None
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -119,8 +130,7 @@ def login():
     if not res.data:
         return jsonify({"ok": False, "error": "Correo o contraseña incorrectos"}), 401
     user = res.data[0]
-    valido = pwd_context.verify(contrasena, user["contrasena"]) if user["contrasena"].startswith("$2b$") else contrasena == user["contrasena"]
-    if not valido:
+    if not verify_password(contrasena, user["contrasena"]):
         return jsonify({"ok": False, "error": "Correo o contraseña incorrectos"}), 401
     permisos_res = supabase.table("roles_permisos").select("permisos(nombre_permiso)").eq("id_role", user["id_role"]).execute()
     permisos = [p["permisos"]["nombre_permiso"] for p in permisos_res.data if p.get("permisos")]
@@ -132,35 +142,31 @@ def inicio():
     user, just_logged_in, pedidos_nuevos = None, False, False
     user_id = session.get("user_id")
 
-    if user_id:
-        res = supabase.table("usuarios").select("*, roles(nombre_role)").eq("id_cliente", user_id).maybe_single().execute()
-
-        if res is not None and res.data:
-            user = res.data
-
-            if not user.get("imagen_url"):
-                user["imagen_url"] = "https://res.cloudinary.com/dmknjcrua/image/upload/v1755983018/defaults/default_icon_profile.png"
-
-            just_logged_in = session.pop("just_logged_in", False)
-
-            permisos_res = supabase.table("roles_permisos").select("permisos(nombre_permiso)").eq("id_role", user["id_role"]).execute()
-            user["permisos"] = [p["permisos"]["nombre_permiso"] for p in permisos_res.data if p.get("permisos")]
-            session["permisos"] = user["permisos"]
-
-            if user["roles"]["nombre_role"] == "admin" and "ver_pedidos" in user["permisos"]:
-                pedidos_res = supabase.table("pedidos").select("*").eq("estado", "nuevo").execute()
-                pedidos_nuevos = bool(pedidos_res.data) if pedidos_res.data else False
-        else:
-            session.clear()
-    else:
+    if not user_id:
         session.clear()
+        return render_template("inicio.html", user=None, just_logged_in=False, pedidos_nuevos=False)
+
+    res = supabase.table("usuarios").select("*, roles(nombre_role)").eq("id_cliente", user_id).maybe_single().execute()
+    if not res.data:
+        session.clear()
+        return render_template("inicio.html", user=None, just_logged_in=False, pedidos_nuevos=False)
+
+    user = res.data
+
+    if not user.get("imagen_url"):
+        user["imagen_url"] = "https://res.cloudinary.com/dmknjcrua/image/upload/v1755983018/defaults/default_icon_profile.png"
+
+    just_logged_in = session.pop("just_logged_in", False)
+
+    permisos_res = supabase.table("roles_permisos").select("permisos(nombre_permiso)").eq("id_role", user.get("id_role")).execute()
+    user["permisos"] = [p["permisos"]["nombre_permiso"] for p in permisos_res.data if p.get("permisos")]
+    session["permisos"] = user["permisos"]
+
+    if user.get("roles", {}).get("nombre_role") == "admin" and "ver_pedidos" in user["permisos"]:
+        pedidos_res = supabase.table("pedidos").select("*").eq("estado", "nuevo").execute()
+        pedidos_nuevos = bool(pedidos_res.data) if pedidos_res.data else False
 
     return render_template("inicio.html", user=user, just_logged_in=just_logged_in, pedidos_nuevos=pedidos_nuevos)
-
-@app.route("/logout", methods=["POST"])
-def logout():
-    session.clear()
-    return jsonify({"success": True})
 
 @app.route("/registro", methods=["GET", "POST", "OPTIONS"])
 def registro():
@@ -181,7 +187,7 @@ def registro():
     )
     if not all([cedula, nombre, apellido, correo, contrasena]):
         return jsonify({"ok": False, "error": "Todos los campos son obligatorios"}), 400
-    hashed = pwd_context.hash(contrasena)
+    hashed = hash_password(contrasena)
     default_img = "static/uploads/default_icon_profile.png"
     try:
         res = supabase.table("usuarios").insert({
@@ -196,10 +202,15 @@ def registro():
         }).execute()
         if not res.data:
             return jsonify({"ok": False, "error": "No se pudo registrar el usuario"}), 400
-        return jsonify({"ok": True, "mensaje": "✅ Usuario registrado exitosamente"}), 201
+        return jsonify({"ok": True, "mensaje": "Usuario Registrado"}), 201
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 400
-   
+    
+@app.route("/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return jsonify({"success": True})
+
 # APARTADO DE PERFILES
 
 @app.route("/mi_perfil", methods=["GET", "POST"])
@@ -292,14 +303,15 @@ def listar_usuarios():
 def cambiar_contrasena():
     user_id = session.get("user_id")
     if not user_id:
-        return jsonify({"ok": False,"error": "No autorizado"}), 401
+        return jsonify({"ok": False, "error": "No autorizado"}), 401
 
     data = request.get_json()
-    nueva = data.get("nueva","").strip()
+    nueva = data.get("nueva", "").strip()
     if not nueva:
-        return jsonify({"ok": False,"error": "Contraseña requerida"}), 400
+        return jsonify({"ok": False, "error": "Contraseña requerida"}), 400
 
-    supabase.table("usuarios").update({"contrasena": nueva}).eq("id_cliente", user_id).execute()
+    hashed = hash_password(nueva)
+    supabase.table("usuarios").update({"contrasena": hashed}).eq("id_cliente", user_id).execute()
     return jsonify({"ok": True})
 
 @app.route("/eliminar_usuario_por_correo", methods=["DELETE"])
@@ -320,7 +332,7 @@ def eliminar_usuario_por_correo():
     supabase.table("usuarios").delete().eq("correo", correo).execute()
     return jsonify({"ok": True})
 
-# APARTADO DE GETION DE PRODUCTOS
+# APARTADO DE GESTION DE PRODUCTOS
 
 @app.route("/gestionar_productos_page", methods=["GET"])
 def productos_page():
@@ -414,7 +426,7 @@ def eliminar_producto(id_producto):
     supabase.table("gestion_productos").delete().eq("id_producto", id_producto).execute()
     return jsonify({"ok": True})
 
-# CATALOGO
+# APARTADO DE CATALOGO
 
 @app.route("/catalogo_page", methods=["GET"])
 def catalogo_page():
@@ -465,7 +477,7 @@ def guardar_catalogo():
         if not productos:
             return {"error": "No hay productos para guardar"}, 400
 
-        insert_catalogo, insert_carrito = [], []
+        insert_carrito = []
 
         for p in productos:
             prod_res = (
@@ -485,12 +497,6 @@ def guardar_catalogo():
             if stock_actual < int(p["cantidad"]):
                 return {"error": f"Stock insuficiente para {nombre_producto}"}, 400
 
-            insert_catalogo.append({
-                "id_producto": p["id_producto"],
-                "nombre_producto": nombre_producto,
-                "cantidad": int(p["cantidad"])
-            })
-
             insert_carrito.append({
                 "id_cliente": user_id,
                 "id_producto": p["id_producto"],
@@ -500,10 +506,9 @@ def guardar_catalogo():
                 "total": precio_unitario * int(p["cantidad"])
             })
 
-        supabase.table("catalogo").insert(insert_catalogo).execute()
         supabase.table("carrito").insert(insert_carrito).execute()
 
-        for p in insert_catalogo:
+        for p in insert_carrito:
             prod_res = supabase.table("gestion_productos").select("stock").eq("id_producto", p["id_producto"]).single().execute()
             nuevo_stock = int(prod_res.data.get("stock", 0)) - int(p["cantidad"])
             supabase.table("gestion_productos").update({"stock": nuevo_stock}).eq("id_producto", p["id_producto"]).execute()
@@ -520,60 +525,6 @@ def carrito_page():
     userLogged = bool(user_id)
     mensaje = "" if userLogged else "Debes iniciar sesión para acceder al carrito"
     return render_template("carrito.html", userLogged=userLogged, mensaje=mensaje)
-
-@app.route("/agregar_al_carrito", methods=["POST"])
-def agregar_al_carrito():
-    id_cliente = session.get("user_id")
-    if not id_cliente:
-        return {"error": "Inicie sesión para agregar productos al carrito"}, 401
-
-    data = request.json
-    productos = data.get("productos", [])
-    if not productos:
-        return {"error": "No hay productos para agregar al carrito"}, 400
-
-    insert_data, carrito_response = [], []
-
-    for p in productos:
-        prod_res = supabase.table("gestion_productos")\
-            .select("nombre, precio, stock, imagen_url")\
-            .eq("id_producto", p["id_producto"]).single().execute()
-        if not prod_res.data:
-            return {"error": f"Producto {p.get('nombre_producto','')} no existe"}, 400
-
-        stock_actual = int(prod_res.data.get("stock", 0))
-        nombre_producto = prod_res.data.get("nombre", "")
-        precio_unitario = float(prod_res.data.get("precio", 0))
-        imagen_url = prod_res.data.get("imagen_url", "")
-        cantidad = int(p["cantidad"])
-        if stock_actual < cantidad:
-            return {"error": f"Stock insuficiente para {nombre_producto}"}, 400
-
-        total = precio_unitario * cantidad
-        insert_data.append({
-            "id_cliente": id_cliente,
-            "id_producto": p["id_producto"],
-            "nombre_producto": nombre_producto,
-            "cantidad": cantidad,
-            "precio_unitario": precio_unitario,
-            "total": total
-        })
-        supabase.table("gestion_productos")\
-            .update({"stock": stock_actual - cantidad})\
-            .eq("id_producto", p["id_producto"]).execute()
-
-        carrito_response.append({
-            "id_producto": p["id_producto"],
-            "nombre_producto": nombre_producto,
-            "cantidad": cantidad,
-            "precio_unitario": precio_unitario,
-            "total": total,
-            "imagen_url": imagen_url,
-            "stock_restante": stock_actual - cantidad
-        })
-
-    supabase.table("carrito").insert(insert_data).execute()
-    return jsonify({"message": "Productos agregados al carrito correctamente", "carrito": carrito_response}), 200
 
 @app.route("/obtener_carrito", methods=["GET"])
 def obtener_carrito():
@@ -596,11 +547,78 @@ def obtener_carrito():
             "cantidad": int(item.get("cantidad", 1)),
             "precio_unitario": float(prod.get("precio",0)),
             "subtotal": float(prod.get("precio",0)) * int(item.get("cantidad",1)),
-            "imagen_url": prod.get("imagen_url") or "",
+            "imagen": prod.get("imagen_url") or "",
             "stock": int(prod.get("stock",0)),
             "agotado": int(prod.get("stock",0)) <= 0
         })
     return jsonify({"productos": carrito_completo})
+
+@app.route("/agregar_al_carrito", methods=["POST"])
+def agregar_al_carrito():
+    id_cliente = session.get("user_id")
+    if not id_cliente:
+        return {"error": "Inicie sesión para agregar productos al carrito"}, 401
+
+    data = request.json
+    productos = data.get("productos", [])
+    if not productos:
+        return {"error": "No hay productos para agregar al carrito"}, 400
+
+    insert_data, carrito_response = [], []
+    for p in productos:
+        prod_res = supabase.table("gestion_productos")\
+            .select("nombre, precio, stock, imagen_url")\
+            .eq("id_producto", p["id_producto"]).single().execute()
+        if not prod_res.data:
+            return {"error": f"Producto {p.get('nombre_producto','')} no existe"}, 400
+
+        stock_actual = int(prod_res.data.get("stock", 0))
+        nombre_producto = prod_res.data.get("nombre", "")
+        precio_unitario = float(prod_res.data.get("precio", 0))
+        imagen_url = prod_res.data.get("imagen_url", "")
+        cantidad = int(p["cantidad"])
+        if stock_actual < cantidad:
+            return {"error": f"Stock insuficiente para {nombre_producto}"}, 400
+
+        carrito_existente_res = supabase.table("carrito")\
+            .select("*").eq("id_cliente", id_cliente)\
+            .eq("id_producto", p["id_producto"]).single().execute()
+        if carrito_existente_res.data:
+            nueva_cantidad = int(carrito_existente_res.data.get("cantidad",1)) + cantidad
+            supabase.table("carrito").update({
+                "cantidad": nueva_cantidad,
+                "total": nueva_cantidad * precio_unitario
+            }).eq("id_carrito", carrito_existente_res.data["id_carrito"]).execute()
+            carrito_response.append({
+                "id_producto": p["id_producto"],
+                "nombre_producto": nombre_producto,
+                "cantidad": nueva_cantidad,
+                "precio_unitario": precio_unitario,
+                "total": nueva_cantidad * precio_unitario,
+                "imagen_url": imagen_url
+            })
+        else:
+            insert_data.append({
+                "id_cliente": id_cliente,
+                "id_producto": p["id_producto"],
+                "nombre_producto": nombre_producto,
+                "cantidad": cantidad,
+                "precio_unitario": precio_unitario,
+                "total": cantidad * precio_unitario
+            })
+            carrito_response.append({
+                "id_producto": p["id_producto"],
+                "nombre_producto": nombre_producto,
+                "cantidad": cantidad,
+                "precio_unitario": precio_unitario,
+                "total": cantidad * precio_unitario,
+                "imagen_url": imagen_url
+            })
+
+    if insert_data:
+        supabase.table("carrito").insert(insert_data).execute()
+
+    return jsonify({"message": "Productos agregados al carrito correctamente", "carrito": carrito_response}), 200
 
 @app.route("/carrito_quitar/<id_carrito>", methods=["DELETE"])
 def carrito_quitar(id_carrito):
@@ -611,11 +629,17 @@ def carrito_quitar(id_carrito):
     carrito_item_res = supabase.table("carrito").select("*").eq("id_carrito", id_carrito).single().execute()
     item = carrito_item_res.data
     if item and item.get("id_cliente") == user_id:
-        stock_actual_res = supabase.table("gestion_productos").select("stock").eq("id_producto", item["id_producto"]).single().execute()
-        stock_actual = stock_actual_res.data.get("stock", 0) if stock_actual_res.data else 0
-        supabase.table("gestion_productos").update({"stock": int(item.get("cantidad",1)) + stock_actual}).eq("id_producto", item["id_producto"]).execute()
+        producto_id = item.get("id_producto")
+        cantidad = item.get("cantidad", 0)
+
+        producto_res = supabase.table("gestion_productos").select("stock").eq("id_producto", producto_id).single().execute()
+        producto = producto_res.data
+        if producto:
+            nuevo_stock = producto.get("stock", 0) + cantidad
+            supabase.table("gestion_productos").update({"stock": nuevo_stock}).eq("id_producto", producto_id).execute()
+
         supabase.table("carrito").delete().eq("id_carrito", id_carrito).execute()
-        return jsonify({"ok": True, "message": "Producto eliminado del carrito"})
+        return jsonify({"ok": True, "message": "Producto eliminado del carrito y stock actualizado"})
     return jsonify({"ok": False, "message": "Producto no encontrado"}), 404
 
 @app.route("/finalizar_compra", methods=["POST"])
@@ -634,209 +658,107 @@ def finalizar_compra():
     if not carrito:
         return jsonify({"message": "Carrito vacío"}), 400
 
-    pedidos_creados, facturas_creadas, total_compra = [], [], 0
-    ids_productos = [item["id_producto"] for item in carrito]
-    productos_res = supabase.table("gestion_productos").select("*").in_("id_producto", ids_productos).execute()
-    productos = {p["id_producto"]: p for p in productos_res.data or []}
+    total_compra = 0
+    detalles_carrito = []
 
     for item in carrito:
-        prod = productos.get(item["id_producto"])
-        if not prod:
-            continue
+        prod_res = supabase.table("gestion_productos").select("precio").eq("id_producto", item["id_producto"]).single().execute()
+        precio_unitario = float(item.get("precio_unitario") or prod_res.data.get("precio", 0))
         cantidad = int(item.get("cantidad", 1))
-        total_item = float(prod.get("precio", 0)) * cantidad
-        total_compra += total_item
+        subtotal_item = precio_unitario * cantidad
+        total_compra += subtotal_item
 
-        pedido_res = supabase.table("pedidos").insert({
-            "id_cliente": user_id,
-            "id_producto": item["id_producto"],
-            "nombre_producto": prod.get("nombre",""),
+        detalles_carrito.append({
+            "id_producto": item.get("id_producto"),
+            "nombre_producto": item.get("nombre_producto",""),
             "cantidad": cantidad,
-            "total": total_item,
-            "direccion_entrega": usuario["direccion"],
-            "metodo_pago": usuario.get("metodo_pago","Efectivo"),
-            "estado": "Pendiente",
-            "pagado": False
+            "precio_unitario": precio_unitario,
+            "subtotal": subtotal_item
+        })
+
+    id_pedido = str(uuid.uuid4())
+    supabase.table("pedidos").insert({
+        "id_pedido": id_pedido,
+        "id_cliente": user_id,
+        "direccion_entrega": usuario["direccion"],
+        "metodo_pago": usuario.get("metodo_pago","Efectivo"),
+        "estado": "Pendiente",
+        "pagado": False,
+        "total": total_compra
+    }).execute()
+
+    for det in detalles_carrito:
+        supabase.table("pedido_detalle").insert({
+            "id_detalle": str(uuid.uuid4()),
+            "id_pedido": id_pedido,
+            "id_producto": det["id_producto"],
+            "nombre_producto": det["nombre_producto"],
+            "cantidad": det["cantidad"],
+            "precio_unitario": det["precio_unitario"],
+            "subtotal": det["subtotal"]
         }).execute()
 
-        if pedido_res.data:
-            pedido_creado = pedido_res.data[0]
-            pedidos_creados.append({
-                **pedido_creado,
-                "nombre_cliente": f"{usuario['nombre']} {usuario['apellido']}",
-                "cedula": usuario["cedula"]
-            })
-
-            factura_res = supabase.table("facturas").insert({
-                "id_cliente": user_id,
-                "id_pedido": pedido_creado["id_pedido"],
-                "subtotal": total_item,
-                "total": total_item,
-                "metodo_pago": usuario.get("metodo_pago","Efectivo"),
-                "estado": "Emitida"
-            }).execute()
-
-            if factura_res.data:
-                facturas_creadas.append(factura_res.data[0])
-
-        supabase.table("gestion_productos").update({"stock": max(0, int(prod.get("stock",0)) - cantidad)}).eq("id_producto", item["id_producto"]).execute()
+    factura_res = supabase.table("facturas").insert({
+        "id_factura": str(uuid.uuid4()),
+        "id_pedido": id_pedido,
+        "id_cliente": user_id,
+        "subtotal": total_compra,
+        "total": total_compra,
+        "metodo_pago": usuario.get("metodo_pago","Efectivo"),
+        "estado": "Emitida"
+    }).execute()
 
     supabase.table("carrito").delete().eq("id_cliente", user_id).execute()
 
     return jsonify({
-        "message": "Pedido enviado y factura generada con éxito",
+        "message": "Pedido enviado y carrito vaciado con éxito",
         "total": total_compra,
-        "pedidos": pedidos_creados,
-        "facturas": facturas_creadas
+        "id_pedido": id_pedido,
+        "productos": detalles_carrito,
+        "metodo_pago": usuario.get("metodo_pago","Efectivo"),
+        "nombre_cliente": f"{usuario.get('nombre','')} {usuario.get('apellido','')}",
+        "cedula": usuario.get("cedula",""),
+        "direccion_entrega": usuario.get("direccion","")
     })
 
 @app.route("/buscar_facturas", methods=["GET"])
 def buscar_facturas():
-    query = request.args.get("q", "").strip()
-    if not query:
-        return jsonify([])
+    cedula = request.args.get("cedula")
+    if not cedula:
+        return jsonify([]), 200
 
-    facturas_res = supabase.table("facturas") \
-        .select("id_factura, id_pedido, numero_factura, subtotal, total, metodo_pago, fecha_emision, estado, id_cliente") \
-        .execute()
-    facturas = facturas_res.data or []
+    usuario_res = supabase.table("usuarios").select("id_cliente, nombre, apellido, cedula, imagen_url").eq("cedula", str(cedula)).limit(1).execute()
+    if not usuario_res.data:
+        return jsonify([]), 200
 
-    usuarios_res = supabase.table("usuarios") \
-        .select("id_cliente, nombre, apellido, cedula") \
-        .execute()
-    usuarios = {u["id_cliente"]: u for u in usuarios_res.data or []}
+    usuario = usuario_res.data[0]
+    id_cliente = usuario["id_cliente"]
+    nombre_cliente = f"{usuario['nombre']} {usuario['apellido']}"
 
-    resultados = []
-    for f in facturas:
-        usuario = usuarios.get(f["id_cliente"], {})
-        cedula_cliente = usuario.get("cedula", "")
-        if query == cedula_cliente:
-            pedidos_res = supabase.table("pedidos") \
-                .select("id_pedido, id_producto, nombre_producto, cantidad, total") \
-                .eq("id_pedido", f["id_pedido"]).execute()
-            pedidos = pedidos_res.data or []
-            resultados.append({
-                "id_factura": f["id_factura"],
-                "id_pedido": f["id_pedido"],
-                "numero_factura": f["numero_factura"],
-                "subtotal": f["subtotal"],
-                "total": f["total"],
-                "metodo_pago": f["metodo_pago"],
-                "fecha_emision": f["fecha_emision"],
-                "estado": f["estado"],
-                "nombre_cliente": f"{usuario.get('nombre','')} {usuario.get('apellido','')}",
-                "cedula": cedula_cliente,
-                "pedidos": pedidos
-            })
+    facturas_res = supabase.table("facturas").select("*").eq("id_cliente", id_cliente).order("fecha_emision", desc=True).execute()
 
-    return jsonify(resultados)
+    facturas = []
+    for f in facturas_res.data:
+        detalles_res = supabase.table("pedido_detalle").select("*").eq("id_pedido", f["id_pedido"]).execute()
+        detalles = detalles_res.data if detalles_res.data else []
 
-# APARTADO DE COMENTARIOS
+        facturas.append({
+            "id_factura": f["id_factura"],
+            "numero_factura": f["numero_factura"],
+            "fecha_emision": f["fecha_emision"],
+            "subtotal": f["subtotal"],
+            "total": f["total"],
+            "metodo_pago": f["metodo_pago"],
+            "estado": f["estado"],
+            "nombre_cliente": nombre_cliente,
+            "cedula": usuario["cedula"],
+            "imagen_usuario": usuario.get("imagen_url"),
+            "productos": detalles
+        })
 
-@app.route("/comentarios_page", methods=["GET"])
-def comentarios_page():
-    user_id = session.get("user_id")
-    if not user_id:
-        return redirect(url_for("login"))
+    facturas.sort(key=lambda x: x["fecha_emision"], reverse=True)
 
-    res_usuario = supabase.table("usuarios").select("id_cliente,nombre,apellido,imagen_url").eq("id_cliente", user_id).single().execute()
-    user = res_usuario.data
-    if not user:
-        return redirect(url_for("login"))
-
-    comentarios_res = supabase.table("comentarios").select("*").order("created_at", desc=False).execute()
-    comentarios = comentarios_res.data or []
-
-    usuarios_res = supabase.table("usuarios").select("id_cliente,nombre,apellido,imagen_url").execute()
-    usuarios_dict = {u["id_cliente"]: {
-                        "nombre_usuario": f"{u['nombre']} {u['apellido']}".strip(),
-                        "foto_perfil": u.get("imagen_url")
-                     } for u in usuarios_res.data} if usuarios_res.data else {}
-
-    for c in comentarios:
-        info = usuarios_dict.get(c["id_usuario"], {"nombre_usuario": "Usuario", "foto_perfil": None})
-        c["usuario_info"] = info
-        if not c.get("foto_perfil"):
-            c["foto_perfil"] = info["foto_perfil"]
-
-    return render_template("comentarios.html", comentarios=comentarios, user_id=user_id)
-
-@app.route("/comentarios", methods=["GET"])
-def obtener_comentarios():
-    comentarios_res = supabase.table("comentarios").select("*").order("created_at", desc=False).execute()
-    comentarios = comentarios_res.data or []
-
-    usuarios_res = supabase.table("usuarios").select("id_cliente,nombre,apellido,imagen_url").execute()
-    usuarios_dict = {u["id_cliente"]: {"nombre_usuario": f"{u['nombre']} {u['apellido']}".strip(),
-                                      "foto_perfil": u.get("imagen_url")}
-                     for u in usuarios_res.data} if usuarios_res.data else {}
-
-    for c in comentarios:
-        info = usuarios_dict.get(c["id_usuario"], {"nombre_usuario": "Usuario", "foto_perfil": None})
-        c["usuario_info"] = info
-        if not c.get("foto_perfil"):
-            c["foto_perfil"] = info["foto_perfil"]
-
-    return jsonify(comentarios)
-
-@app.route("/comentarios", methods=["POST"])
-def crear_comentario():
-    if "user_id" not in session:
-        return jsonify({"error": "Usuario no autenticado"}), 401
-    data = request.get_json()
-    mensaje = data.get("mensaje", "").strip()
-    if not mensaje:
-        return jsonify({"error": "Mensaje requerido"}), 400
-
-    res_usuario = supabase.table("usuarios").select("id_cliente,nombre,apellido,correo,imagen_url").eq("id_cliente", session["user_id"]).single().execute()
-    user = res_usuario.data
-    if not user:
-        return jsonify({"error": "Usuario no encontrado"}), 404
-
-    nuevo = supabase.table("comentarios").insert({
-        "id_usuario": user["id_cliente"],
-        "nombre_usuario": f"{user['nombre']} {user['apellido']}",
-        "correo_usuario": user["correo"],
-        "foto_perfil": user.get("imagen_url"),
-        "mensaje": mensaje
-    }).execute()
-    return jsonify(nuevo.data[0])
-
-@app.route("/comentarios/<id>", methods=["PUT"])
-def editar_comentario(id):
-    if "user_id" not in session:
-        return jsonify({"error": "Usuario no autenticado"}), 401
-    data = request.get_json()
-    mensaje = data.get("mensaje", "").strip()
-    if not mensaje:
-        return jsonify({"error": "Mensaje requerido"}), 400
-
-    comentario_res = supabase.table("comentarios").select("*").eq("id", id).single().execute()
-    comentario = comentario_res.data
-    if not comentario:
-        return jsonify({"error": "Comentario no encontrado"}), 404
-
-    if comentario["id_usuario"] != session["user_id"]:
-        return jsonify({"error": "No puedes editar este comentario"}), 403
-
-    actualizado = supabase.table("comentarios").update({"mensaje": mensaje}).eq("id", id).execute()
-    return jsonify(actualizado.data[0])
-
-@app.route("/comentarios/<id>", methods=["DELETE"])
-def eliminar_comentario(id):
-    if "user_id" not in session:
-        return jsonify({"error": "Usuario no autenticado"}), 401
-
-    comentario_res = supabase.table("comentarios").select("*").eq("id", id).single().execute()
-    comentario = comentario_res.data
-    if not comentario:
-        return jsonify({"error": "Comentario no encontrado"}), 404
-
-    if comentario["id_usuario"] != session["user_id"]:
-        return jsonify({"error": "No puedes eliminar este comentario"}), 403
-
-    supabase.table("comentarios").delete().eq("id", id).execute()
-    return jsonify({"ok": True})
+    return jsonify(facturas), 200
 
 # APARTADO DE PEDIDOS
 
@@ -969,7 +891,114 @@ def eliminar_pedido(id_pedido):
     print(f"[Pedidos] Pedido {id_pedido} eliminado")
     return jsonify({"success": True, "message": "Pedido eliminado correctamente"})
 
-# APP RUN
+# APARTADO DE COMENTARIOS
+
+@app.route("/comentarios_page", methods=["GET"])
+def comentarios_page():
+    user_id = session.get("user_id")
+    if not user_id:
+        return redirect(url_for("login"))
+
+    res_usuario = supabase.table("usuarios").select("id_cliente,nombre,apellido,imagen_url").eq("id_cliente", user_id).single().execute()
+    user = res_usuario.data
+    if not user:
+        return redirect(url_for("login"))
+
+    comentarios_res = supabase.table("comentarios").select("*").order("created_at", desc=False).execute()
+    comentarios = comentarios_res.data or []
+
+    usuarios_res = supabase.table("usuarios").select("id_cliente,nombre,apellido,imagen_url").execute()
+    usuarios_dict = {u["id_cliente"]: {
+                        "nombre_usuario": f"{u['nombre']} {u['apellido']}".strip(),
+                        "foto_perfil": u.get("imagen_url")
+                     } for u in usuarios_res.data} if usuarios_res.data else {}
+
+    for c in comentarios:
+        info = usuarios_dict.get(c["id_usuario"], {"nombre_usuario": "Usuario", "foto_perfil": None})
+        c["usuario_info"] = info
+        if not c.get("foto_perfil"):
+            c["foto_perfil"] = info["foto_perfil"]
+
+    return render_template("comentarios.html", comentarios=comentarios, user_id=user_id)
+
+@app.route("/comentarios", methods=["GET"])
+def obtener_comentarios():
+    comentarios_res = supabase.table("comentarios").select("*").order("created_at", desc=False).execute()
+    comentarios = comentarios_res.data or []
+
+    usuarios_res = supabase.table("usuarios").select("id_cliente,nombre,apellido,imagen_url").execute()
+    usuarios_dict = {u["id_cliente"]: {"nombre_usuario": f"{u['nombre']} {u['apellido']}".strip(),
+                                      "foto_perfil": u.get("imagen_url")}
+                     for u in usuarios_res.data} if usuarios_res.data else {}
+
+    for c in comentarios:
+        info = usuarios_dict.get(c["id_usuario"], {"nombre_usuario": "Usuario", "foto_perfil": None})
+        c["usuario_info"] = info
+        if not c.get("foto_perfil"):
+            c["foto_perfil"] = info["foto_perfil"]
+
+    return jsonify(comentarios)
+
+@app.route("/comentarios", methods=["POST"])
+def crear_comentario():
+    if "user_id" not in session:
+        return jsonify({"error": "Usuario no autenticado"}), 401
+    data = request.get_json()
+    mensaje = data.get("mensaje", "").strip()
+    if not mensaje:
+        return jsonify({"error": "Mensaje requerido"}), 400
+
+    res_usuario = supabase.table("usuarios").select("id_cliente,nombre,apellido,correo,imagen_url").eq("id_cliente", session["user_id"]).single().execute()
+    user = res_usuario.data
+    if not user:
+        return jsonify({"error": "Usuario no encontrado"}), 404
+
+    nuevo = supabase.table("comentarios").insert({
+        "id_usuario": user["id_cliente"],
+        "nombre_usuario": f"{user['nombre']} {user['apellido']}",
+        "correo_usuario": user["correo"],
+        "foto_perfil": user.get("imagen_url"),
+        "mensaje": mensaje
+    }).execute()
+    return jsonify(nuevo.data[0])
+
+@app.route("/comentarios/<id>", methods=["PUT"])
+def editar_comentario(id):
+    if "user_id" not in session:
+        return jsonify({"error": "Usuario no autenticado"}), 401
+    data = request.get_json()
+    mensaje = data.get("mensaje", "").strip()
+    if not mensaje:
+        return jsonify({"error": "Mensaje requerido"}), 400
+
+    comentario_res = supabase.table("comentarios").select("*").eq("id", id).single().execute()
+    comentario = comentario_res.data
+    if not comentario:
+        return jsonify({"error": "Comentario no encontrado"}), 404
+
+    if comentario["id_usuario"] != session["user_id"]:
+        return jsonify({"error": "No puedes editar este comentario"}), 403
+
+    actualizado = supabase.table("comentarios").update({"mensaje": mensaje}).eq("id", id).execute()
+    return jsonify(actualizado.data[0])
+
+@app.route("/comentarios/<id>", methods=["DELETE"])
+def eliminar_comentario(id):
+    if "user_id" not in session:
+        return jsonify({"error": "Usuario no autenticado"}), 401
+
+    comentario_res = supabase.table("comentarios").select("*").eq("id", id).single().execute()
+    comentario = comentario_res.data
+    if not comentario:
+        return jsonify({"error": "Comentario no encontrado"}), 404
+
+    if comentario["id_usuario"] != session["user_id"]:
+        return jsonify({"error": "No puedes eliminar este comentario"}), 403
+
+    supabase.table("comentarios").delete().eq("id", id).execute()
+    return jsonify({"ok": True})
+
+# APARTADO DEL APP RUN
 
 def get_local_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -992,7 +1021,7 @@ if __name__ == "__main__":
     port = 8000
     local_ip = get_local_ip()
 
-    debug_mode = False
+    debug_mode = True
 
     if debug_mode:
         print("⚡ Ejecutando en modo DEBUG con servidor de desarrollo de Flask")
