@@ -14,6 +14,61 @@ function showMessage(msg, isError = false) {
     new bootstrap.Toast(toastEl, { delay: 1500 }).show();
 }
 
+function mostrarModalUsuario(usuario) {
+    const modalEl = document.createElement("div");
+    modalEl.className = "modal fade";
+    modalEl.tabIndex = -1;
+    modalEl.innerHTML = `
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content p-3">
+                <div class="modal-header">
+                    <h5 class="modal-title">Información del Usuario</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img src="${usuario.imagen_usuario || 'https://via.placeholder.com/120'}" alt="Usuario" class="rounded-circle mb-3" width="120" height="120" style="object-fit:cover;">
+                    <div class="card p-3">
+                        <p><strong>Nombre:</strong> ${usuario.nombre_cliente || ''}</p>
+                        <p><strong>Teléfono:</strong> ${usuario.telefono || ''}</p>
+                        <p><strong>Correo:</strong> ${usuario.correo || ''}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modalEl);
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+    modalEl.addEventListener("hidden.bs.modal", () => modalEl.remove());
+}
+
+function mostrarModalProducto(producto) {
+    const modalEl = document.createElement("div");
+    modalEl.className = "modal fade";
+    modalEl.tabIndex = -1;
+    modalEl.innerHTML = `
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content p-3">
+                <div class="modal-header">
+                    <h5 class="modal-title">Información del Producto</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img src="${producto.imagen || 'https://via.placeholder.com/200'}" alt="${producto.nombre_producto}" class="mb-3" width="200" height="200" style="object-fit:cover;">
+                    <div class="card p-3">
+                        <p><strong>Nombre:</strong> ${producto.nombre_producto || ''}</p>
+                        <p><strong>Descripción:</strong> ${producto.descripcion || 'Sin descripción disponible'}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modalEl);
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+    modalEl.addEventListener("hidden.bs.modal", () => modalEl.remove());
+}
+
 function mostrarFactura(data, mostrarFoto = false) {
     const contenedor = document.getElementById("facturaContainer");
     const productos = data.productos || [];
@@ -34,13 +89,13 @@ function mostrarFactura(data, mostrarFoto = false) {
 
     div.innerHTML = `
         <div class="d-flex align-items-center mb-2">
-            ${mostrarFoto ? `<img src="${data.imagen_usuario || 'https://via.placeholder.com/60'}" alt="Usuario" class="rounded-circle me-3" width="60" height="60">` : ''}
+            ${mostrarFoto ? `<img src="${data.imagen_usuario || 'https://via.placeholder.com/60'}" alt="Usuario" class="rounded-circle me-3 perfil-click" width="60" height="60" style="cursor:pointer;">` : ''}
             <div>
                 <strong>#${data.id_pedido || 'N/A'}</strong><br>
                 Cliente: ${data.nombre_cliente || ''}<br>
                 Cédula: ${data.cedula || ''}<br>
                 Dirección: ${data.direccion_entrega || ''}<br>
-                Método de Pago: ${data.metodo_pago || ''}<br>
+                ${''}<br>
             </div>
         </div>
         <table class="table table-sm table-bordered text-center">
@@ -57,6 +112,11 @@ function mostrarFactura(data, mostrarFoto = false) {
         <p><strong>Método de Pago:</strong> ${data.metodo_pago || ''}</p>
     `;
     contenedor.prepend(div);
+
+    const fotoPerfil = div.querySelector(".perfil-click");
+    if (fotoPerfil) {
+        fotoPerfil.addEventListener("click", () => mostrarModalUsuario(data));
+    }
 }
 
 async function generarFactura() {
@@ -130,7 +190,7 @@ async function cargarCarrito() {
             const tr = document.createElement("tr");
             tr.dataset.id = item.id_carrito;
             tr.innerHTML = `<td class="d-flex flex-column align-items-center">
-                                <img src="${item.imagen || 'https://via.placeholder.com/70'}" class="img-preview mb-1" alt="${item.nombre_producto}" width="70" height="70">
+                                <img src="${item.imagen || 'https://via.placeholder.com/70'}" class="img-preview mb-1 producto-click" alt="${item.nombre_producto}" width="70" height="70" style="cursor:pointer;">
                                 <div>${item.nombre_producto}</div>
                             </td>
                             <td>x${item.cantidad}</td>
@@ -156,6 +216,8 @@ async function cargarCarrito() {
                     showMessage("No se pudo eliminar el producto", true);
                 }
             });
+            const imgPreview = tr.querySelector(".producto-click");
+            imgPreview.addEventListener("click", () => mostrarModalProducto(item));
             tbody.appendChild(tr);
         });
         document.getElementById("totalCarrito").textContent = total.toLocaleString('es-CO', { style: 'currency', currency: 'COP' });
@@ -222,7 +284,7 @@ function mostrarFacturasBuscadas() {
 
         div.innerHTML = `
             <div class="d-flex align-items-center mb-2">
-                <img src="${f.imagen_usuario || 'https://via.placeholder.com/60'}" alt="Usuario" class="rounded-circle me-3" width="60" height="60">
+                <img src="${f.imagen_usuario || 'https://via.placeholder.com/60'}" alt="Usuario" class="rounded-circle me-3 perfil-click" width="60" height="60" style="cursor:pointer;">
                 <div>
                     <strong>#${f.numero_factura}</strong><br>
                     Cliente: ${f.nombre_cliente}<br>
@@ -245,6 +307,11 @@ function mostrarFacturasBuscadas() {
             <p><strong>Fecha Emisión:</strong> ${new Date(f.fecha_emision).toLocaleString('es-CO')}</p>
         `;
         contenedor.appendChild(div);
+
+        const fotoPerfil = div.querySelector(".perfil-click");
+        if (fotoPerfil) {
+            fotoPerfil.addEventListener("click", () => mostrarModalUsuario(f));
+        }
     });
 
     paginarFacturas();

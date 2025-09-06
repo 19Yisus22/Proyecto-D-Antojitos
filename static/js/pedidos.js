@@ -58,51 +58,33 @@ async function cargarPedidos(){
   const res = await fetch("/obtener_pedidos");
   const pedidos = await res.json();
   if(!Array.isArray(pedidos)) return;
-  const pedidosMap = new Map();
-  pedidos.forEach(p=>{
-    if(!pedidosMap.has(p.id_pedido)) pedidosMap.set(p.id_pedido,{...p, items:[]});
-    pedidosMap.get(p.id_pedido).items.push({
-      nombre_producto: p.nombre_producto,
-      cantidad: p.cantidad,
-      total: p.total,
-      pagado: p.pagado
-    });
-    pedidosMap.get(p.id_pedido).fecha_emision = p.fecha_emision;
-    pedidosMap.get(p.id_pedido).cliente = p.cliente;
-    pedidosMap.get(p.id_pedido).cedula = p.cedula;
-    pedidosMap.get(p.id_pedido).direccion_entrega = p.direccion_entrega;
-    pedidosMap.get(p.id_pedido).metodo_pago = p.metodo_pago;
-    pedidosMap.get(p.id_pedido).imagen_url = p.imagen_url;
-    pedidosMap.get(p.id_pedido).estado = p.estado;
-    pedidosMap.get(p.id_pedido).pagado = p.pagado;
-  });
 
-  pedidosGlobal = Array.from(pedidosMap.values()).map(pedido=>{
+  pedidosGlobal = pedidos.map(pedido=>{
     const card = document.createElement("div");
     card.className="pedido-card card-collapsed col-12 mb-3 p-2 shadow-sm";
-    card.dataset.cliente=(pedido.cliente||'desconocido').toLowerCase();
+    card.dataset.cliente=(pedido.usuarios?.nombre||'desconocido').toLowerCase();
     card.dataset.estado=pedido.estado;
     card.dataset.pagado=pedido.pagado;
     card.id=`pedido-${pedido.id_pedido}`;
 
-    let itemsHTML = pedido.items.map(item=>{
+    let itemsHTML = (pedido.pedido_detalle||[]).map(item=>{
       return `<tr>
         <td>${item.nombre_producto}</td>
         <td>${item.cantidad}</td>
-        <td>${item.total.toLocaleString('es-CO',{style:'currency',currency:'COP'})}</td>
+        <td>${item.subtotal.toLocaleString('es-CO',{style:'currency',currency:'COP'})}</td>
         <td>
-          <i class="bi ${item.pagado?'bi-check-circle text-success':'bi-x-circle text-danger'} fs-4 toggle-pago" style="cursor:pointer" data-id="${pedido.id_pedido}" data-pagado="${item.pagado}"></i>
+          <i class="bi ${pedido.pagado?'bi-check-circle text-success':'bi-x-circle text-danger'} fs-4 toggle-pago" style="cursor:pointer" data-id="${pedido.id_pedido}" data-pagado="${pedido.pagado}"></i>
         </td>
       </tr>`;
     }).join("");
 
-    const fechaStr = pedido.fecha_emision ? new Date(pedido.fecha_emision).toLocaleString('es-CO', {dateStyle:'short', timeStyle:'short'}) : 'No registrada';
+    const fechaStr = pedido.fecha_pedido ? new Date(pedido.fecha_pedido).toLocaleString('es-CO', {dateStyle:'short', timeStyle:'short'}) : 'No registrada';
 
     card.innerHTML = `
-      <div class="card">
+      <div class="card ${pedido.estado==='Cancelado'?'bg-light text-muted':''}">
         <div class="card-header d-flex justify-content-between align-items-center">
           <div class="d-flex align-items-center gap-2">
-            <img src="${pedido.imagen_url || '/static/uploads/default.png'}" alt="Perfil" class="rounded-circle" style="width:40px;height:40px;object-fit:cover;">
+            <img src="${pedido.usuarios?.imagen_url || '/static/uploads/default.png'}" alt="Perfil" class="rounded-circle perfil-img" style="width:40px;height:40px;object-fit:cover;cursor:pointer;">
             <div>
               <strong>Pedido #${pedido.id_pedido}</strong><br>
               <small>Estado: ${pedido.estado} - ${pedido.pagado?'Pagado':'No Pagado'} | Fecha: ${fechaStr}</small>
@@ -114,8 +96,8 @@ async function cargarPedidos(){
           </div>
         </div>
         <div class="card-body">
-          <p><strong>Cliente:</strong> ${pedido.cliente||'Desconocido'}</p>
-          <p><strong>Cédula:</strong> ${pedido.cedula||'No registrada'}</p>
+          <p><strong>Cliente:</strong> ${(pedido.usuarios?.nombre||'Desconocido')} ${(pedido.usuarios?.apellido||'')}</p>
+          <p><strong>Cédula:</strong> ${pedido.usuarios?.cedula||'No registrada'}</p>
           <p><strong>Dirección:</strong> ${pedido.direccion_entrega||'No registrada'}</p>
           <p><strong>Método de Pago:</strong> ${pedido.metodo_pago||'No especificado'}</p>
           <table class="table table-sm mt-2 align-middle text-center">
@@ -123,19 +105,19 @@ async function cargarPedidos(){
             <tbody>${itemsHTML}</tbody>
           </table>
           <div class="mt-3">
-            <select class="form-select estado-select">
+            <select class="form-select estado-select" ${pedido.estado==='Cancelado'?'disabled':''}>
               <option value="Pendiente" ${pedido.estado==='Pendiente'?'selected':''}>Pendiente</option>
               <option value="Entregado" ${pedido.estado==='Entregado'?'selected':''}>Entregado</option>
               <option value="Cancelado" ${pedido.estado==='Cancelado'?'selected':''}>Cancelado</option>
             </select>
-            <button class="btn btn-primary btn-sm mt-2 actualizar-btn">Actualizar Estado</button>
+            <button class="btn btn-primary btn-sm mt-2 actualizar-btn" ${pedido.estado==='Cancelado'?'disabled':''}>Actualizar Estado</button>
           </div>
         </div>
       </div>`;
 
     card.querySelector(".toggle-detalle").addEventListener("click",()=>card.classList.toggle("card-collapsed"));
 
-    card.querySelector(".actualizar-btn").addEventListener("click",async()=>{
+    card.querySelector(".actualizar-btn")?.addEventListener("click",async()=>{
       const nuevo_estado=card.querySelector(".estado-select").value;
       await fetch(`/actualizar_estado/${pedido.id_pedido}`,{
         method:"PUT",
@@ -148,6 +130,7 @@ async function cargarPedidos(){
     });
 
     card.querySelectorAll(".toggle-pago").forEach(icon=>{
+      if(pedido.estado==='Cancelado') icon.style.pointerEvents='none';
       icon.addEventListener("click", async ()=>{
         const id = icon.dataset.id;
         const pagadoActual = icon.dataset.pagado === 'true';
@@ -170,6 +153,25 @@ async function cargarPedidos(){
           showMessage("No se pudo actualizar el pago", true);
         }
       });
+    });
+
+    card.querySelector(".perfil-img").addEventListener("click",()=>{
+      const imgUrl = pedido.usuarios?.imagen_url || '/static/uploads/default.png';
+      const modal = document.createElement("div");
+      modal.className="modal fade";
+      modal.tabIndex="-1";
+      modal.innerHTML=`
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-body text-center">
+              <img src="${imgUrl}" alt="Perfil" style="max-width:100%;height:auto;border-radius:10px;">
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(modal);
+      const bsModal = new bootstrap.Modal(modal);
+      bsModal.show();
+      modal.addEventListener("hidden.bs.modal",()=>modal.remove());
     });
 
     return card;

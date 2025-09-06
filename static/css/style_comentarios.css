@@ -93,9 +93,22 @@ textarea#mensajeInput:focus {
 }
 
 .dropdown-actions {
-    position: absolute;
-    z-index: 1050;
+    position: fixed;
+    z-index: 999999;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     display: none;
+}
+
+.dropdown-actions li {
+    list-style: none;
+    padding: 8px 12px;
+    cursor: pointer;
+}
+
+.dropdown-actions li:hover {
+    background: #ffe8d6;
 }
 
 .footer-container {

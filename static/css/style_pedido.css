@@ -142,8 +142,8 @@ h2 {
 }
 
 .pedido-card.seleccion {
-  border: 2px solid red;
-  transition: border 0.2s ease-in-out;
+border: 2px solid red;
+transition: none;
 }
 
 .card-collapsed .card-body {

@@ -2,8 +2,6 @@ const chatBox = document.getElementById("chatBox");
 const sendBtn = document.getElementById("sendBtn");
 const mensajeInput = document.getElementById("mensajeInput");
 const toastContainer = document.getElementById('toastContainer');
-const accionesContainer = document.getElementById('accionesDropdownContainer');
-const accionesDropdown = document.getElementById('accionesDropdown');
 let comentarioAbierto = null;
 let editandoComentario = null;
 
@@ -16,7 +14,7 @@ function showMessage(msg, isError=false){
     toastEl.setAttribute('aria-live','assertive');
     toastEl.setAttribute('aria-atomic','true');
     toastEl.innerHTML = `<div class="d-flex"><div class="toast-body">${isError?'❌':'✅'} ${msg}</div>
-        <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div>`;
+        <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast"></button></div>`;
     toastContainer.appendChild(toastEl);
     new bootstrap.Toast(toastEl,{delay:800}).show();
 }
@@ -27,14 +25,17 @@ function bloquearAcciones(){
 
 function renderComentario(c){
     const div = document.createElement("div");
-    div.classList.add("message");
+    div.classList.add("message", "position-relative");
     div.dataset.id = c.id;
     div.dataset.usuario = c.id_usuario;
     const fotoPerfil = c.usuario_info?.foto_perfil;
     const nombreUsuario = c.usuario_info?.nombre_usuario || 'Usuario';
+    const telefono = c.usuario_info?.telefono || 'N/A';
+    const correo = c.usuario_info?.correo || 'N/A';
     let imgHtml = '';
     if(fotoPerfil){
-        imgHtml = `<img src="${fotoPerfil}" alt="perfil" class="rounded-circle me-2" style="width:40px;height:40px;object-fit:cover;">`;
+        imgHtml = `<img src="${fotoPerfil}" alt="perfil" class="rounded-circle me-2 foto-click" 
+            style="width:40px;height:40px;object-fit:cover;cursor:pointer;">`;
     }
     div.innerHTML = `
         <div class="d-flex align-items-start">
@@ -58,22 +59,59 @@ function renderComentario(c){
         dots.style.top = "10px";
         dots.style.right = "10px";
         dots.style.fontSize = "1.5rem";
-        dots.addEventListener("click", (e)=>{
-            e.stopPropagation();
-            if(comentarioAbierto === c.id){
-                accionesContainer.style.display = "none";
-                comentarioAbierto = null;
-                return;
-            }
-            accionesDropdown.innerHTML = `<li><a class="dropdown-item" href="#" onclick="iniciarEdicion('${c.id}','${c.mensaje.replace(/'/g,"\\'")}')">✏️ Editar</a></li>
-                <li><a class="dropdown-item" href="#" onclick="eliminarComentario('${c.id}')">🗑️ Eliminar</a></li>`;
-            const rect = e.target.getBoundingClientRect();
-            accionesContainer.style.top = `${rect.bottom + window.scrollY}px`;
-            accionesContainer.style.left = `${rect.left + window.scrollX}px`;
-            accionesContainer.style.display = "block";
-            comentarioAbierto = c.id;
-        });
+        dots.style.transition = "transform 0.2s ease";
+        dots.addEventListener("mouseenter",()=>dots.style.transform="scale(1.2)");
+        dots.addEventListener("mouseleave",()=>dots.style.transform="scale(1)");
         div.appendChild(dots);
+
+        dots.addEventListener("click",(e)=>{
+            e.stopPropagation();
+            document.querySelectorAll("body > .comentario-dropdown").forEach(dd=>dd.remove());
+            const dropdown = document.createElement("ul");
+            dropdown.className = "list-group position-absolute bg-white shadow rounded comentario-dropdown";
+            dropdown.style.position = "absolute";
+            dropdown.style.zIndex = "99999";
+            dropdown.innerHTML = `
+                <li class="list-group-item p-2" style="cursor:pointer;" onclick="iniciarEdicion('${c.id}','${c.mensaje.replace(/'/g,"\\'")}');this.closest('ul').remove();">✏️ Editar</li>
+                <li class="list-group-item p-2 text-danger" style="cursor:pointer;" onclick="eliminarComentario('${c.id}');this.closest('ul').remove();">🗑️ Eliminar</li>
+            `;
+            document.body.appendChild(dropdown);
+            const rect = dots.getBoundingClientRect();
+            dropdown.style.top = `${rect.bottom + window.scrollY}px`;
+            dropdown.style.left = `${rect.left + window.scrollX - dropdown.offsetWidth + 25}px`;
+
+            const closeDropdown = (ev)=>{
+                if(!dropdown.contains(ev.target) && ev.target!==dots){
+                    dropdown.remove();
+                    document.removeEventListener("click", closeDropdown);
+                }
+            };
+            document.addEventListener("click", closeDropdown);
+        });
+    }
+    const imgEl = div.querySelector(".foto-click");
+    if(imgEl){
+        imgEl.addEventListener("click", ()=>{
+            const modalHtml = `
+                <div class="modal fade" id="perfilModal" tabindex="-1">
+                  <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content p-3">
+                      <img src="${fotoPerfil}" alt="perfil-grande" class="img-fluid rounded mb-3">
+                      <div class="card p-3">
+                        <h5 class="mb-2">${nombreUsuario}</h5>
+                        <p class="mb-1"><strong>Teléfono:</strong> ${telefono}</p>
+                        <p class="mb-0"><strong>Correo:</strong> ${correo}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>`;
+            document.body.insertAdjacentHTML("beforeend", modalHtml);
+            const modal = new bootstrap.Modal(document.getElementById("perfilModal"));
+            modal.show();
+            document.getElementById("perfilModal").addEventListener("hidden.bs.modal", function(){
+                this.remove();
+            });
+        });
     }
     return div;
 }
@@ -98,8 +136,6 @@ async function cargarComentarios(){
 function iniciarEdicion(id,mensaje){
     mensajeInput.value = mensaje;
     editandoComentario = id;
-    accionesContainer.style.display = "none";
-    comentarioAbierto = null;
     sendBtn.textContent = "Guardar Cambios";
     mensajeInput.focus();
 }
@@ -143,12 +179,5 @@ async function eliminarComentario(id){
         showMessage("Error eliminando comentario",true);
     }
 }
-
-document.addEventListener("click",(e)=>{
-    if(!accionesContainer.contains(e.target) && !e.target.closest(".bi-three-dots-vertical")){
-        accionesContainer.style.display = "none";
-        comentarioAbierto = null;
-    }
-});
 
 cargarComentarios();
