@@ -113,10 +113,6 @@ async function loginUser(correo, contrasena){
   }
 }
 
-{% if user and user.rol == 'admin' and just_logged_in %}
-showMessage('Hay pedidos nuevos', false, '/pedidos_page');
-{% endif %}
-
 const urlParams = new URLSearchParams(window.location.search);
 const mensaje = urlParams.get('mensaje');
 if(mensaje){
@@ -146,10 +142,9 @@ window.addEventListener('load', () => {
 });
 
 if('serviceWorker' in navigator){
-  window.addEventListener('load', ()=>{
-    navigator.serviceWorker.register('/service-worker.js');
-  });
+    window.addEventListener('load',()=>navigator.serviceWorker.register('/static/js/service-worker-inicio.js').then(()=>console.log('SW registrado')).catch(console.error));
 }
+
 </script>
 </body>
 </html>

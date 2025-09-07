@@ -171,12 +171,23 @@ function agregarEventosProductos() {
   });
 }
 
-async function cargarProductos() {
+async function cargarProductosCache() {
+  const cached = localStorage.getItem('catalogoCache');
+  if (cached) {
+    const data = JSON.parse(cached);
+    productos = data;
+    renderProductos(searchInput.value);
+    document.getElementById("spinner").style.display = "none";
+    catalogoContainer.classList.remove("d-none");
+  }
+
   try {
     const res = await fetch("/obtener_catalogo");
+    if (!res.ok) throw new Error("Error al cargar productos");
     const data = await res.json();
     productos = data.productos || [];
-    renderProductos();
+    localStorage.setItem('catalogoCache', JSON.stringify(productos));
+    renderProductos(searchInput.value);
     document.getElementById("spinner").style.display = "none";
     catalogoContainer.classList.remove("d-none");
   } catch (e) { showMessage("Error al cargar los productos", true); }
@@ -195,9 +206,13 @@ searchInput.addEventListener("input", () => {
   renderProductos(searchInput.value);
 });
 
-window.addEventListener("load", cargarProductos);
-
 btnCarrito.addEventListener("click", () => {
   if (!userLogged) { showMessage("Inicie sesión para ver su carrito", true); return; }
   window.location.href = "/carrito_page";
 });
+
+window.addEventListener("load", cargarProductosCache);
+
+if('serviceWorker' in navigator){
+    window.addEventListener('load',()=>navigator.serviceWorker.register('/static/js/service-worker-catalogo.js').then(()=>console.log('SW registrado')).catch(console.error));
+}

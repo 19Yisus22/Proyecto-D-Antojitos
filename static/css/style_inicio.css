@@ -4,7 +4,7 @@ html, body {
     display: flex;
     flex-direction: column;
     font-family: 'Comic Sans MS', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: #f9e0e5 url('{{ url_for("static", filename="uploads/logo_fondo.png") }}') no-repeat center center;
+    background: #f9e0e5;
     background-size: 250px 250px;
     background-attachment: fixed;
     scroll-behavior: smooth;

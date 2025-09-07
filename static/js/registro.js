@@ -21,10 +21,7 @@ form.addEventListener("submit", async e => {
   const telefono = document.getElementById("telefono").value.trim();
   const contrasena = document.getElementById("contrasena").value;
 
-  if(!cedula || !nombre || !apellido || !correo || !contrasena){ 
-    showMessage("Completa todos los campos obligatorios", true); 
-    return; 
-  }
+  if(!cedula || !nombre || !apellido || !correo || !contrasena){ showMessage("Completa todos los campos obligatorios", true); return; }
   if(!/^\d{6,15}$/.test(cedula)){ showMessage("Cédula inválida", true); return; }
   if(telefono && !/^\+?\d{7,15}$/.test(telefono)){ showMessage("Teléfono inválido", true); return; }
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)){ showMessage("Correo inválido", true); return; }
@@ -49,3 +46,7 @@ form.addEventListener("submit", async e => {
     showMessage("Error al conectar con el servidor", true);
   }
 });
+
+if('serviceWorker' in navigator){
+    window.addEventListener('load',()=>navigator.serviceWorker.register('/static/js/service-worker-registro.js').then(()=>console.log('SW registrado')).catch(console.error));
+}

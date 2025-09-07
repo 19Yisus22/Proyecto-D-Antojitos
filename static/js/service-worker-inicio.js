@@ -133,6 +133,7 @@ async function cargarComentarios(){
         localStorage.setItem('chatCache', JSON.stringify(data));
         chatBox.innerHTML = "";
         data.forEach(c => chatBox.appendChild(renderComentario(c)));
+
         const scrollPos = localStorage.getItem('chatScroll');
         chatBox.scrollTop = scrollPos ? parseInt(scrollPos) : chatBox.scrollHeight;
     }catch(error){
@@ -194,5 +195,7 @@ window.addEventListener('beforeunload', ()=>{
 cargarComentarios();
 
 if('serviceWorker' in navigator){
-    window.addEventListener('load',()=>navigator.serviceWorker.register('/static/js/service-worker-comentarios.js').then(()=>console.log('SW registrado')).catch(console.error));
+    window.addEventListener('load', ()=>{
+        navigator.serviceWorker.register('/service-worker.js');
+    });
 }

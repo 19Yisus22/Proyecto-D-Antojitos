@@ -64,3 +64,7 @@ if (linkInicio) {
     window.location.href = "/inicio";
   });
 }
+
+if('serviceWorker' in navigator){
+    window.addEventListener('load',()=>navigator.serviceWorker.register('/static/js/service-worker-login.js').then(()=>console.log('SW registrado')).catch(console.error));
+}

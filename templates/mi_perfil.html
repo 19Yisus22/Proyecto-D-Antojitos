@@ -18,7 +18,7 @@
 <div class="card p-4 mb-4">
 <form id="formPerfil" enctype="multipart/form-data">
 <div class="d-flex flex-column align-items-center mb-3 position-relative">
-<img id="previewImagen" src="{{ user.imagen_url or '/static/default_icon_profile.png' }}" class="img-preview rounded-circle" width="120" height="120" style="object-fit:cover;cursor:pointer;">
+<img id="previewImagen" src="{{ user.imagen_url or '/static/uploads/default_icon_profile.png' }}" class="img-preview rounded-circle" width="120" height="120" style="object-fit:cover;cursor:pointer;">
 <label for="imagen_url" class="position-absolute" style="bottom:0; right:calc(50% - 60px); cursor:pointer;">
 <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" fill="#d35400" class="bi bi-camera-fill" viewBox="0 0 16 16">
 <path d="M10.5 5.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 0 1H11v.5a.5.5 0 0 1-1 0V7.5h-.5a.5.5 0 0 1 0-1H10V6a.5.5 0 0 1 .5-.5z"/>
@@ -130,6 +130,7 @@ const correoPerfil=document.getElementById("correoPerfil");
 const direccionPerfil=document.getElementById("direccionPerfil");
 const metodoPagoPerfil=document.getElementById("metodoPagoPerfil");
 const rolSelect=document.getElementById("rolSelect");
+
 btnEditarPerfil.addEventListener("click",()=>{
   cedulaPerfil.disabled=false;
   nombrePerfil.disabled=false;
@@ -187,6 +188,7 @@ btnCambiarContrasena.addEventListener("click",async()=>{
 const correoEliminar=document.getElementById("correoEliminar");
 const btnEliminarUsuario=document.getElementById("btnEliminarUsuario");
 const usuariosList=document.getElementById("usuariosList");
+
 btnEliminarUsuario.addEventListener("click",async()=>{
   const correo=correoEliminar.value.trim();
   if(!correo){showMessage("Debe ingresar un correo válido.",true);return;}
@@ -198,71 +200,86 @@ btnEliminarUsuario.addEventListener("click",async()=>{
 });
 
 async function fetchUsuarios(){
+  const cached=localStorage.getItem('usuariosCache');
+  if(cached){
+    renderUsuarios(JSON.parse(cached));
+  }
   const res=await fetch("/listar_usuarios");
   if(res.ok){
     const data=await res.json();
-    usuariosList.innerHTML="";
-    let adminsCount=data.filter(u=>u.roles.nombre_role==="admin").length;
-    data.forEach(u=>{
-      const div=document.createElement("div");
-      div.className="d-flex align-items-center justify-content-between mb-2";
-      const leftDiv=document.createElement("div");
-      leftDiv.className="d-flex align-items-center";
-      const img=document.createElement("img");
-      img.src=u.imagen_url||"/static/default_icon_profile.png";
-      img.className="user-img-list";
-      img.style.cursor="pointer";
-      img.addEventListener("click",()=>{
-        document.getElementById("modalImg").src=img.src;
-        document.getElementById("modalId").textContent=u.id_cliente;
-        document.getElementById("modalNombre").textContent=u.nombre+" "+u.apellido;
-        document.getElementById("modalCedula").textContent=u.cedula||"";
-        document.getElementById("modalTelefono").textContent=u.telefono||"";
-        document.getElementById("modalCorreo").textContent=u.correo||"";
-        document.getElementById("modalDireccion").textContent=u.direccion||"";
-        document.getElementById("modalMetodoPago").textContent=u.metodo_pago||"";
-        document.getElementById("modalFecha").textContent=new Date(u.fecha_creacion).toLocaleString("es-CO");
-        document.getElementById("modalRol").textContent=u.roles.nombre_role;
-        new bootstrap.Modal(document.getElementById("imgModal")).show();
-      });
-      const nombre=document.createElement("span");
-      nombre.textContent=u.nombre+" "+u.apellido+" ("+u.correo+")";
-      leftDiv.appendChild(img);
-      leftDiv.appendChild(nombre);
-      const rolUserSelect=document.createElement("select");
-      rolUserSelect.className="form-select w-auto";
-      rolUserSelect.innerHTML='<option value="cliente">Cliente</option><option value="admin">Admin</option>';
-      rolUserSelect.value=u.roles.nombre_role;
-      rolUserSelect.addEventListener("change",async()=>{
-        if(rolUserSelect.value==="admin"&&adminsCount>=3){
-          showMessage("Máximo 3 administradores permitidos",true);
-          rolUserSelect.value=u.roles.nombre_role;
-          return;
-        }
-        try{
-          const resUpdate=await fetch("/actualizar_rol_usuario",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:u.id_cliente,rol:rolUserSelect.value})});
-          const result=await resUpdate.json();
-          if(resUpdate.ok&&result.ok){
-            u.roles.nombre_role=rolUserSelect.value;
-            adminsCount=data.filter(user=>user.roles.nombre_role==="admin").length;
-            showMessage("Rol Actualizado");
-          }else{
-            showMessage(result.error||"Error al actualizar rol",true);
-            rolUserSelect.value=u.roles.nombre_role;
-          }
-        }catch(error){
-          showMessage("Error en la conexión con el servidor",true);
-          rolUserSelect.value=u.roles.nombre_role;
-        }
-      });
-      div.appendChild(leftDiv);
-      div.appendChild(rolUserSelect);
-      usuariosList.appendChild(div);
-    });
+    localStorage.setItem('usuariosCache',JSON.stringify(data));
+    renderUsuarios(data);
   }
 }
+
+function renderUsuarios(data){
+  usuariosList.innerHTML="";
+  let adminsCount=data.filter(u=>u.roles.nombre_role==="admin").length;
+  data.forEach(u=>{
+    const div=document.createElement("div");
+    div.className="d-flex align-items-center justify-content-between mb-2";
+    const leftDiv=document.createElement("div");
+    leftDiv.className="d-flex align-items-center";
+    const img=document.createElement("img");
+    img.src=u.imagen_url||"/static/uploads/default_icon_profile.png";
+    img.className="user-img-list";
+    img.style.cursor="pointer";
+    img.addEventListener("click",()=>{
+      document.getElementById("modalImg").src=img.src;
+      document.getElementById("modalId").textContent=u.id_cliente;
+      document.getElementById("modalNombre").textContent=u.nombre+" "+u.apellido;
+      document.getElementById("modalCedula").textContent=u.cedula||"";
+      document.getElementById("modalTelefono").textContent=u.telefono||"";
+      document.getElementById("modalCorreo").textContent=u.correo||"";
+      document.getElementById("modalDireccion").textContent=u.direccion||"";
+      document.getElementById("modalMetodoPago").textContent=u.metodo_pago||"";
+      document.getElementById("modalFecha").textContent=new Date(u.fecha_creacion).toLocaleString("es-CO");
+      document.getElementById("modalRol").textContent=u.roles.nombre_role;
+      new bootstrap.Modal(document.getElementById("imgModal")).show();
+    });
+    const nombre=document.createElement("span");
+    nombre.textContent=u.nombre+" "+u.apellido+" ("+u.correo+")";
+    leftDiv.appendChild(img);
+    leftDiv.appendChild(nombre);
+    const rolUserSelect=document.createElement("select");
+    rolUserSelect.className="form-select w-auto";
+    rolUserSelect.innerHTML='<option value="cliente">Cliente</option><option value="admin">Admin</option>';
+    rolUserSelect.value=u.roles.nombre_role;
+    rolUserSelect.addEventListener("change",async()=>{
+      if(rolUserSelect.value==="admin"&&adminsCount>=3){
+        showMessage("Máximo 3 administradores permitidos",true);
+        rolUserSelect.value=u.roles.nombre_role;
+        return;
+      }
+      try{
+        const resUpdate=await fetch("/actualizar_rol_usuario",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:u.id_cliente,rol:rolUserSelect.value})});
+        const result=await resUpdate.json();
+        if(resUpdate.ok&&result.ok){
+          u.roles.nombre_role=rolUserSelect.value;
+          adminsCount=data.filter(user=>user.roles.nombre_role==="admin").length;
+          showMessage("Rol Actualizado");
+        }else{
+          showMessage(result.error||"Error al actualizar rol",true);
+          rolUserSelect.value=u.roles.nombre_role;
+        }
+      }catch(error){
+        showMessage("Error en la conexión con el servidor",true);
+        rolUserSelect.value=u.roles.nombre_role;
+      }
+    });
+    div.appendChild(leftDiv);
+    div.appendChild(rolUserSelect);
+    usuariosList.appendChild(div);
+  });
+}
+
 fetchUsuarios();
 {% endif %}
+
+if('serviceWorker' in navigator){
+    window.addEventListener('load',()=>navigator.serviceWorker.register('/static/js/service-worker-perfil.js').then(()=>console.log('SW registrado')).catch(console.error));
+}
+
 </script>
 </body>
 </html>
