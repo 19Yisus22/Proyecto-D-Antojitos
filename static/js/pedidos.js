@@ -1,7 +1,9 @@
 const toastContainer = document.getElementById('toastContainer');
+const alertaCancelado = document.getElementById('alertaCancelado');
 const itemsPorPagina = 5;
 let pedidosGlobal = [];
 let pedidosFiltrados = [];
+let pedidosCanceladosVerificados = JSON.parse(localStorage.getItem("pedidosCanceladosVerificados") || "[]");
 
 function showMessage(msg, isError=false){
   const toastEl = document.createElement('div');
@@ -15,6 +17,43 @@ function showMessage(msg, isError=false){
   </div>`;
   toastContainer.appendChild(toastEl);
   new bootstrap.Toast(toastEl,{delay:1200}).show();
+}
+
+function mostrarAlertaCancelado(pedidoId){
+  if(pedidosCanceladosVerificados.includes(pedidoId)) return;
+
+  let modal = document.createElement("div");
+  modal.className = "modal fade";
+  modal.tabIndex = "-1";
+  modal.innerHTML = `
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content shadow-lg border-0 rounded-3">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title">⚠ Pedido Cancelado</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body text-center">
+          <p class="fs-5">El pedido <strong>#${pedidoId}</strong> fue cancelado.</p>
+          <p class="text-muted">Verifique este pedido antes de presionar el check.</p>
+        </div>
+        <div class="modal-footer justify-content-center">
+          <button class="btn btn-success px-4" id="verificar-${pedidoId}">Verificado ✔</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  const bsModal = new bootstrap.Modal(modal);
+  bsModal.show();
+
+  document.getElementById(`verificar-${pedidoId}`).addEventListener("click",()=>{
+    pedidosCanceladosVerificados.push(pedidoId);
+    localStorage.setItem("pedidosCanceladosVerificados", JSON.stringify(pedidosCanceladosVerificados));
+    bsModal.hide();
+  });
+
+  modal.addEventListener("hidden.bs.modal",()=>modal.remove());
 }
 
 function renderizarPaginacion(lista){
@@ -58,7 +97,6 @@ async function cargarPedidos(){
   const res = await fetch("/obtener_pedidos");
   const pedidos = await res.json();
   if(!Array.isArray(pedidos)) return;
-
   pedidosGlobal = pedidos.map(pedido=>{
     const card = document.createElement("div");
     card.className="pedido-card card-collapsed col-12 mb-3 p-2 shadow-sm";
@@ -66,7 +104,6 @@ async function cargarPedidos(){
     card.dataset.estado=pedido.estado;
     card.dataset.pagado=pedido.pagado;
     card.id=`pedido-${pedido.id_pedido}`;
-
     let itemsHTML = (pedido.pedido_detalle||[]).map(item=>{
       return `<tr>
         <td>${item.nombre_producto}</td>
@@ -77,9 +114,7 @@ async function cargarPedidos(){
         </td>
       </tr>`;
     }).join("");
-
     const fechaStr = pedido.fecha_pedido ? new Date(pedido.fecha_pedido).toLocaleString('es-CO', {dateStyle:'short', timeStyle:'short'}) : 'No registrada';
-
     card.innerHTML = `
       <div class="card ${pedido.estado==='Cancelado'?'bg-light text-muted':''}">
         <div class="card-header d-flex justify-content-between align-items-center">
@@ -114,9 +149,8 @@ async function cargarPedidos(){
           </div>
         </div>
       </div>`;
-
+    if(pedido.estado==="Cancelado"){ mostrarAlertaCancelado(pedido.id_pedido); }
     card.querySelector(".toggle-detalle").addEventListener("click",()=>card.classList.toggle("card-collapsed"));
-
     card.querySelector(".actualizar-btn")?.addEventListener("click",async()=>{
       const nuevo_estado=card.querySelector(".estado-select").value;
       await fetch(`/actualizar_estado/${pedido.id_pedido}`,{
@@ -124,11 +158,9 @@ async function cargarPedidos(){
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({estado:nuevo_estado})
       });
-      showMessage(`Estado del pedido #${pedido.id_pedido} actualizado a ${nuevo_estado}`);
       card.dataset.estado=nuevo_estado;
       aplicarFiltros();
     });
-
     card.querySelectorAll(".toggle-pago").forEach(icon=>{
       if(pedido.estado==='Cancelado') icon.style.pointerEvents='none';
       icon.addEventListener("click", async ()=>{
@@ -154,7 +186,6 @@ async function cargarPedidos(){
         }
       });
     });
-
     card.querySelector(".perfil-img").addEventListener("click",()=>{
       const imgUrl = pedido.usuarios?.imagen_url || '/static/uploads/default.png';
       const modal = document.createElement("div");
@@ -173,10 +204,8 @@ async function cargarPedidos(){
       bsModal.show();
       modal.addEventListener("hidden.bs.modal",()=>modal.remove());
     });
-
     return card;
   });
-
   pedidosFiltrados=[...pedidosGlobal];
   aplicarFiltros();
 }
