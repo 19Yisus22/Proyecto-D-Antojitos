@@ -1,17 +1,9 @@
-import os
-import uuid
-import socket
-import secrets
-import logging
-import hashlib
-import websockets
-import cloudinary
-import cloudinary.uploader
 from waitress import serve
 from flask_cors import CORS
 from dotenv import load_dotenv
 from supabase import create_client
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
+import os, uuid, socket, secrets, logging, hashlib, websockets, cloudinary, cloudinary.uploader
 
 # RUTAS Y DIRECTORIOS
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
