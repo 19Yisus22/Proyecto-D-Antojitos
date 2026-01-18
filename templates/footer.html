@@ -1,0 +1,42 @@
+<div class="footer-container mt-5">
+  <footer class="footer py-4">
+    <div class="container footer-content d-flex flex-wrap justify-content-between align-items-start">
+      <div class="footer-section">
+        <h3>Contáctanos</h3>
+        <div class="info-item"><i class="bi bi-person-fill"></i> Nombre: Teresa Rubio García</div>
+        <div class="info-item"><i class="bi bi-telephone-fill"></i> Teléfono / WhatsApp: +57 3115699825</div>
+        <div class="info-item"><i class="bi bi-envelope-fill"></i> Correo: terugag@hotmail.com</div>
+        <div class="info-item"><i class="bi bi-geo-alt-fill"></i> Dirección: Carrera 4 #14-38 Urb. La Catalana - Chinácota - N.S</div>
+        <div class="info-item"><i class="bi bi-clock-fill"></i> Horarios de atención: Viernes a Domingo - Festivos a partir de las 9:00 AM - 6:00 PM</div>
+        
+        {% if request.path == '/catalogo_page' or request.path == '/carrito_page' %}
+        <div class="info-item">
+          <i class="bi bi-cash-coin"></i> Transferencias Bancarias:
+          <ul class="list-unstyled ms-3 mt-2">
+            <li><img src="{{ url_for('static', filename='uploads/nequi.logo.png') }}" alt="Nequi" width="20" class="me-2"> Nequi - 3115699825</li>
+            <li><img src="{{ url_for('static', filename='uploads/daviplata.logo.png') }}" alt="Daviplata" width="20" class="me-2"> Daviplata - 3115699825</li>
+            <li><img src="{{ url_for('static', filename='uploads/bancolombia.logo.png') }}" alt="Bancolombia" width="20" class="me-2"> Bancolombia - 83459079397</li>
+            <li><img src="{{ url_for('static', filename='uploads/nu.logo.png') }}" alt="Nu" width="20" class="me-2"> Nu - 3115699825</li>
+          </ul>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="footer-section">
+        <h5>Síganos en:</h5>
+        <a href="https://www.instagram.com/teresa.rubio.7311" class="social-icon text-light"><i class="bi bi-instagram"></i></a>
+      </div>
+
+      <div class="footer-section text-center">
+        <h4>D'Antojitos</h4>
+        <a href="/catalogo_page">
+          <img src="{{ url_for('static', filename='uploads/logo.ico') }}" alt="Logo" class="app-badge">
+        </a>
+      </div>
+    </div>
+
+    <div class="text-center mt-3 footer-bottom">
+      <p>D'Antojitos 2025 © - Todos los derechos reservados</p>
+    </div>
+  </footer>
+</div>

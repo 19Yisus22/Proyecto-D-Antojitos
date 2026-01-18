@@ -1,15 +1,19 @@
 html, body {
     height: 100%;
     margin: 0;
+}
+
+body {
     display: flex;
     flex-direction: column;
+    min-height: 100vh;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background: #fff8f0;
     scroll-behavior: smooth;
 }
 
 main {
-    flex: 1;
+    flex: 1 0 auto;
     padding-bottom: 2rem;
 }
 
@@ -91,15 +95,12 @@ h2 {
     transform: scale(1.02);
 }
 
-.footer-container {
-    margin-top: auto;
-}
-
-.footer {
+footer, .footer {
+    flex-shrink: 0;
     background-color: #000;
     color: #fff;
     padding: 20px 0;
-    flex-shrink: 0;
+    margin-top: auto;
 }
 
 .footer h3, .footer h4, .footer h5, .footer p, .footer a, .footer .social-icon i {

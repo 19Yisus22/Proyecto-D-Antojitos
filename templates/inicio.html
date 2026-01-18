@@ -14,137 +14,55 @@
 {% include 'navbar.html' %}
 
 <div class="container mt-4">
-  <div class="row">
-    <div class="col-lg-8">
-      <h1>Bienvenid@ a D'Antojitos - {% if user %}{{ user.nombre }} {{ user.apellido }}{% endif %}</h1>
-      <section id="vision">
-        <h3>Nuestra historia y pasión</h3>
-        <p class="descripcion-postre">
-          Le damos la bienvenida a <strong>D'Antojitos</strong>, un espacio donde la pasión por la repostería se convierte en experiencias inolvidables. Nuestro emprendimiento nace del amor por los sabores auténticos y la creatividad en cada detalle, transformando ingredientes frescos y de la más alta calidad en postres que deleitan tanto la vista como el paladar. Cada pastel, cada cupcake y cada dulce es elaborado cuidadosamente, combinando tradición y técnicas innovadoras para ofrecerte productos únicos que hacen que cada ocasión se vuelva especial.
-        </p>
-        <p class="descripcion-postre">
-          En <strong>D'Antojitos</strong> creemos que los momentos más simples pueden convertirse en recuerdos extraordinarios con un toque de dulzura. Nos esforzamos por llevar alegría y satisfacción a tu mesa, ofreciendo desde clásicos reconfortantes hasta creaciones sorprendentes que despiertan todos tus sentidos. Nuestra misión es endulzar tus días y acompañarte en celebraciones, aniversarios, encuentros familiares o simplemente en esos pequeños instantes que merecen ser disfrutados con un buen postre.
-        </p>
-        <p class="descripcion-postre">
-          Descubre con nosotros un mundo donde la imaginación y el sabor se encuentran, y déjate llevar por la experiencia de probar postres que no solo alimentan, sino que inspiran, conectan y celebran la vida en cada bocado.
-        </p>
-        <div class="imagenes-container">
-          <img src="{{ url_for('static', filename='uploads/postre3.jpeg') }}" alt="Postre 3" class="postre-imagen">
-          <img src="{{ url_for('static', filename='uploads/postre1.jpeg') }}" alt="Postre 1" class="postre-imagen">
-          <img src="{{ url_for('static', filename='uploads/postre2.jpeg') }}" alt="Postre 2" class="postre-imagen">
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <h1>Bienvenid@ a D'Antojitos - {% if user %}{{ user.nombre }} {{ user.apellido }}{% endif %}</h1>
+            <section id="vision">
+                <h3>Nuestra historia y pasión</h3>
+                
+                <div class="carousel-container-custom">
+                    <div id="carouselPromo" class="carousel slide" data-bs-ride="carousel">
+                        <div class="carousel-inner text-center" id="carouselItems"></div>
+                        <button class="carousel-control-prev" type="button" data-bs-target="#carouselPromo" data-bs-slide="prev">
+                            <span class="carousel-control-prev-icon" style="filter: invert(1);"></span>
+                        </button>
+                        <button class="carousel-control-next" type="button" data-bs-target="#carouselPromo" data-bs-slide="next">
+                            <span class="carousel-control-next-icon" style="filter: invert(1);"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <p class="descripcion-postre">
+                  Le damos la bienvenida a <strong>D'Antojitos</strong>, un espacio donde la pasión por la repostería se convierte en experiencias inolvidables. Nuestro emprendimiento nace del amor por los sabores auténticos y la creatividad en cada detalle, transformando ingredientes frescos y de la más alta calidad en postres que deleitan tanto la vista como el paladar. Cada pastel, cada cupcake y cada dulce es elaborado cuidadosamente, combinando tradición y técnicas innovadoras para ofrecerte productos únicos que hacen que cada ocasión se vuelva especial.
+                </p>
+                <p class="descripcion-postre">
+                  En <strong>D'Antojitos</strong> creemos que los momentos más simples pueden convertirse en recuerdos extraordinarios con un toque de dulzura. Nos esforzamos por llevar alegría y satisfacción a tu mesa, ofreciendo desde clásicos reconfortantes hasta creaciones sorprendentes que despiertan todos tus sentidos. Nuestra misión es endulzar tus días y acompañarte en celebraciones, aniversarios, encuentros familiares o simplemente en esos pequeños instantes que merecen ser disfrutados con un buen postre.
+                </p>
+                <p class="descripcion-postre">
+                  Descubre con nosotros un mundo donde la imaginación y el sabor se encuentran, y déjate llevar por la experiencia de probar postres que no solo alimentan, sino que inspiran, conectan y celebran la vida en cada bocado.
+                </p>
+                <h4 id="tituloInicio" class="mt-4"></h4>
+                <p class="descripcion-postre" id="infoInicioTexto"></p>
+            </section>
         </div>
-      </section>
+        <div class="col-lg-4">
+            <div class="row g-3" id="seccionesAlFrente"></div>
+            <div class="sidebar mt-4">
+                <h5>Navegar por D'Antojitos:</h5>
+                <a href="/catalogo_page" class="btn btn-outline-dark w-100 mb-2">Catálogo de Productos</a>
+                <a href="/comentarios_page" class="btn btn-outline-dark w-100">Opiniones</a>
+            </div>
+        </div>
     </div>
-    <div class="col-lg-4">
-      <div class="sidebar">
-        <h5>Navegar por D'Antojitos:</h5>
-        <a href="/catalogo_page">Catálogo de Productos</a>
-        <a href="/comentarios_page">Opiniones</a>
-      </div>
-    </div>
-  </div>
+    <div class="row mt-5 g-4 justify-content-center" id="seccionesDebajo"></div>
 </div>
 
-<div id="toastContainer"></div>
+<div id="toastContainer" class="position-fixed p-3 top-0 end-0" style="z-index:2000;"></div>
 
-<div class="footer-container mt-5">
-  <footer class="footer py-4">
-    <div class="container footer-content d-flex flex-wrap justify-content-between align-items-start">
-      <div class="footer-section">
-        <h3>Contáctanos</h3>
-        <div class="info-item"><i class="bi bi-person-fill"></i> Nombre: Teresa Rubio García</div>
-        <div class="info-item"><i class="bi bi-telephone-fill"></i> Teléfono / WhatsApp: +57 3115699825</div>
-        <div class="info-item"><i class="bi bi-envelope-fill"></i> Correo: terugag@hotmail.com</div>
-        <div class="info-item"><i class="bi bi-geo-alt-fill"></i> Dirección: Carrera 4 #14-38 Urb. La Catalana - Chinácota - N.S</div>
-        <div class="info-item"><i class="bi bi-clock-fill"></i> Horarios de atención: Viernes a Domingo - Festivos a partir de las 9:00 AM - 6:00 PM</div>
-      </div>
-      <div class="footer-section">
-        <h5>Síganos en:</h5>
-        <a href="https://www.instagram.com/teresa.rubio.7311?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==" class="social-icon text-light"><i class="bi bi-instagram"></i></a>
-      </div>
-      <div class="footer-section text-center">
-        <h4>D'Antojitos</h4>
-        <a href="/inicio"><img src="{{ url_for('static', filename='uploads/logo.ico') }}" alt="Logo" class="app-badge"></a>
-      </div>
-    </div>
-    <div class="text-center mt-3 footer-bottom">
-      <p>D'Antojitos 2025 © - Todos los derechos reservados</p>
-    </div>
-  </footer>
-</div>
+{% include 'footer.html' %}
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-function showMessage(msg,isError=false, link=null){
-  const toastContainer=document.getElementById('toastContainer');
-  const toastEl=document.createElement('div');
-  toastEl.className='toast align-items-center text-bg-light border-0';
-  toastEl.setAttribute('role','alert');
-  toastEl.setAttribute('aria-live','assertive');
-  toastEl.setAttribute('aria-atomic','true');
-  toastEl.innerHTML=`<div class="d-flex">
-    <div class="toast-body" style="cursor:pointer">${isError?'❌':'✅'} ${msg}</div>
-    <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-  </div>`;
-  if(link){
-    toastEl.querySelector('.toast-body').addEventListener('click',()=>{window.location.href=link;});
-  }
-  toastContainer.appendChild(toastEl);
-  const toast=new bootstrap.Toast(toastEl,{delay:800});
-  toast.show();
-}
+<script src="{{ url_for('static', filename='js/inicio.js') }}"></script>
 
-async function loginUser(correo, contrasena){
-  try{
-    const res=await fetch("/login",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({correo, contrasena})
-    });
-    const data=await res.json();
-    if(res.ok && data.ok){
-      showMessage("Login exitoso", false, data.redirect);
-      setTimeout(()=>window.location.href=data.redirect, 1000);
-    } else {
-      showMessage(data.error||"Error al iniciar sesión", true);
-    }
-  }catch(err){
-    showMessage("Error al conectar con el servidor", true);
-  }
-}
-
-const urlParams = new URLSearchParams(window.location.search);
-const mensaje = urlParams.get('mensaje');
-if(mensaje){
-  showMessage(mensaje, true);
-}
-
-document.querySelectorAll('.sidebar a').forEach(anchor=>{
-  const href=anchor.getAttribute('href');
-  if(href.startsWith("/inicio")){
-    anchor.addEventListener('click',function(e){
-      e.preventDefault();
-      const target=document.querySelector(href);
-      if(target){
-        target.scrollIntoView({behavior:'smooth'});
-      }
-    });
-  }
-});
-
-window.addEventListener('beforeunload', () => {
-  localStorage.setItem('scrollPos', window.scrollY);
-});
-
-window.addEventListener('load', () => {
-  const scrollPos = localStorage.getItem('scrollPos');
-  if(scrollPos) window.scrollTo(0, parseInt(scrollPos));
-});
-
-if('serviceWorker' in navigator){
-    window.addEventListener('load',()=>navigator.serviceWorker.register('/static/js/service-worker-inicio.js').then(()=>console.log('SW registrado')).catch(console.error));
-}
-
-</script>
 </body>
 </html>

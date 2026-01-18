@@ -16,28 +16,30 @@ function showMessage(msg, isError=false){
     <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast"></button>
   </div>`;
   toastContainer.appendChild(toastEl);
-  new bootstrap.Toast(toastEl,{delay:1200}).show();
+  new bootstrap.Toast(toastEl,{delay:2500}).show();
 }
 
 function mostrarAlertaCancelado(pedidoId){
-  if(pedidosCanceladosVerificados.includes(pedidoId)) return;
+  const idStr = String(pedidoId);
+  if(pedidosCanceladosVerificados.includes(idStr)) return;
 
   let modal = document.createElement("div");
   modal.className = "modal fade";
+  modal.id = `modal-alerta-${idStr}`;
   modal.tabIndex = "-1";
   modal.innerHTML = `
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content shadow-lg border-0 rounded-3">
         <div class="modal-header bg-danger text-white">
           <h5 class="modal-title">⚠ Pedido Cancelado</h5>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body text-center">
-          <p class="fs-5">El pedido <strong>#${pedidoId}</strong> fue cancelado.</p>
+          <p class="fs-5">El pedido <strong>#${idStr}</strong> fue cancelado.</p>
           <p class="text-muted">Verifique este pedido antes de presionar el check.</p>
         </div>
         <div class="modal-footer justify-content-center">
-          <button class="btn btn-success px-4" id="verificar-${pedidoId}">Verificado ✔</button>
+          <button class="btn btn-success px-4" id="verificar-${idStr}">Verificado ✔</button>
         </div>
       </div>
     </div>
@@ -47,9 +49,11 @@ function mostrarAlertaCancelado(pedidoId){
   const bsModal = new bootstrap.Modal(modal);
   bsModal.show();
 
-  document.getElementById(`verificar-${pedidoId}`).addEventListener("click",()=>{
-    pedidosCanceladosVerificados.push(pedidoId);
-    localStorage.setItem("pedidosCanceladosVerificados", JSON.stringify(pedidosCanceladosVerificados));
+  document.getElementById(`verificar-${idStr}`).addEventListener("click",()=>{
+    if(!pedidosCanceladosVerificados.includes(idStr)){
+        pedidosCanceladosVerificados.push(idStr);
+        localStorage.setItem("pedidosCanceladosVerificados", JSON.stringify(pedidosCanceladosVerificados));
+    }
     bsModal.hide();
   });
 
@@ -97,6 +101,7 @@ async function cargarPedidos(){
   const res = await fetch("/obtener_pedidos");
   const pedidos = await res.json();
   if(!Array.isArray(pedidos)) return;
+  
   pedidosGlobal = pedidos.map(pedido=>{
     const card = document.createElement("div");
     card.className="pedido-card card-collapsed col-12 mb-3 p-2 shadow-sm";
@@ -104,7 +109,10 @@ async function cargarPedidos(){
     card.dataset.estado=pedido.estado;
     card.dataset.pagado=pedido.pagado;
     card.id=`pedido-${pedido.id_pedido}`;
+
+    let totalPedido = 0;
     let itemsHTML = (pedido.pedido_detalle||[]).map(item=>{
+      totalPedido += item.subtotal;
       return `<tr>
         <td>${item.nombre_producto}</td>
         <td>${item.cantidad}</td>
@@ -114,7 +122,17 @@ async function cargarPedidos(){
         </td>
       </tr>`;
     }).join("");
+
+    const totalFilaHTML = `
+      <tr class="table-secondary fw-bold">
+        <td colspan="2" class="text-end">TOTAL A PAGAR:</td>
+        <td>${totalPedido.toLocaleString('es-CO',{style:'currency',currency:'COP'})}</td>
+        <td></td>
+      </tr>
+    `;
+
     const fechaStr = pedido.fecha_pedido ? new Date(pedido.fecha_pedido).toLocaleString('es-CO', {dateStyle:'short', timeStyle:'short'}) : 'No registrada';
+    
     card.innerHTML = `
       <div class="card ${pedido.estado==='Cancelado'?'bg-light text-muted':''}">
         <div class="card-header d-flex justify-content-between align-items-center">
@@ -136,8 +154,8 @@ async function cargarPedidos(){
           <p><strong>Dirección:</strong> ${pedido.direccion_entrega||'No registrada'}</p>
           <p><strong>Método de Pago:</strong> ${pedido.metodo_pago||'No especificado'}</p>
           <table class="table table-sm mt-2 align-middle text-center">
-            <thead class="table-light"><tr><th>Producto</th><th>Cantidad</th><th>Total</th><th>Pago</th></tr></thead>
-            <tbody>${itemsHTML}</tbody>
+            <thead class="table-light"><tr><th>Producto</th><th>Cantidad</th><th>Subtotal</th><th>Pago</th></tr></thead>
+            <tbody>${itemsHTML}${totalFilaHTML}</tbody>
           </table>
           <div class="mt-3">
             <select class="form-select estado-select" ${pedido.estado==='Cancelado'?'disabled':''}>
@@ -149,18 +167,30 @@ async function cargarPedidos(){
           </div>
         </div>
       </div>`;
-    if(pedido.estado==="Cancelado"){ mostrarAlertaCancelado(pedido.id_pedido); }
+
+    if(pedido.estado==="Cancelado"){ 
+        mostrarAlertaCancelado(pedido.id_pedido); 
+    }
+
     card.querySelector(".toggle-detalle").addEventListener("click",()=>card.classList.toggle("card-collapsed"));
+    
     card.querySelector(".actualizar-btn")?.addEventListener("click",async()=>{
       const nuevo_estado=card.querySelector(".estado-select").value;
-      await fetch(`/actualizar_estado/${pedido.id_pedido}`,{
+      const res = await fetch(`/actualizar_estado/${pedido.id_pedido}`,{
         method:"PUT",
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({estado:nuevo_estado})
       });
-      card.dataset.estado=nuevo_estado;
-      aplicarFiltros();
+      if(res.ok){
+          card.dataset.estado=nuevo_estado;
+          showMessage(`Pedido #${pedido.id_pedido}: Estado actualizado a ${nuevo_estado}`);
+          if(nuevo_estado === "Cancelado") mostrarAlertaCancelado(pedido.id_pedido);
+          aplicarFiltros();
+      } else {
+          showMessage("Error al actualizar estado", true);
+      }
     });
+
     card.querySelectorAll(".toggle-pago").forEach(icon=>{
       if(pedido.estado==='Cancelado') icon.style.pointerEvents='none';
       icon.addEventListener("click", async ()=>{
@@ -179,13 +209,15 @@ async function cargarPedidos(){
           icon.classList.toggle("text-danger", !nuevoPago);
           icon.dataset.pagado = nuevoPago;
           card.dataset.pagado = nuevoPago;
+          const statusPago = nuevoPago ? "PAGADO" : "PENDIENTE";
+          showMessage(`Pedido #${id}: Pago marcado como ${statusPago}`);
           aplicarFiltros();
-          showMessage(`Pago del pedido #${id} actualizado`);
         } else {
           showMessage("No se pudo actualizar el pago", true);
         }
       });
     });
+
     card.querySelector(".perfil-img").addEventListener("click",()=>{
       const imgUrl = pedido.usuarios?.imagen_url || '/static/uploads/default.png';
       const modal = document.createElement("div");
@@ -236,7 +268,7 @@ document.getElementById("eliminarSeleccionados").addEventListener("click",async(
   pedidosGlobal=pedidosGlobal.filter(c=>!c.classList.contains("seleccion"));
   pedidosFiltrados=pedidosFiltrados.filter(c=>!c.classList.contains("seleccion"));
   aplicarFiltros();
-  showMessage("Pedidos Eliminados");
+  showMessage("Pedidos Eliminados correctamente");
 });
 
 cargarPedidos();

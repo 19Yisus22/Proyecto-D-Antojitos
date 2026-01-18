@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pedidos | D'Antojitos ©</title>
+<title>Gestionar Pedidos | D'Antojitos ©</title>
 <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='uploads/logo.ico') }}">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
@@ -13,61 +13,63 @@
 
 {% include 'navbar.html' %}
 
-<div class="container mt-4">
-  <h2 class="mb-4 text-center">Gestionar Pedidos</h2>
-  <div class="d-flex gap-2 mb-3">
-    <input type="text" id="buscarCliente" class="form-control" placeholder="Buscar por nombre del cliente">
+{% if session.get('user_id') and session.get('rol') == 'admin' %}
+<main class="container mt-4 flex-grow-1">
+  <div class="card-title-marketing mb-4 text-center">
+    <h3><i class="bi bi-clipboard-check"></i> Gestionar Pedidos</h3>
+  </div>
+
+  <div class="d-flex gap-2 mb-3 flex-wrap">
+    <div class="input-group flex-grow-1">
+      <span class="input-group-text"><i class="bi bi-search"></i></span>
+      <input type="text" id="buscarCliente" class="form-control" placeholder="Buscar por nombre del cliente">
+    </div>
     <select id="filtroEstado" class="form-select w-auto">
-      <option value="Todos">Todos</option>
+      <option value="Todos">Todos los Estados</option>
       <option value="Pendiente">Pendientes</option>
       <option value="Entregado">Entregados</option>
       <option value="Cancelado">Cancelados</option>
       <option value="Terminados">Terminados</option>
     </select>
-    <button id="eliminarSeleccionados" class="btn btn-danger">Borrar Seleccionados</button>
+    <button id="eliminarSeleccionados" class="btn btn-danger fw-bold">
+      <i class="bi bi-trash"></i> Borrar Seleccionados
+    </button>
   </div>
-  <div class="table-responsive">
-    <table class="table table-bordered">
-      <thead>
-        <tr><th id="tituloTabla">Todos los pedidos</th></tr>
+
+  <div class="table-responsive shadow-sm rounded">
+    <table class="table table-hover table-bordered bg-white align-middle">
+      <thead class="table-dark">
+        <tr>
+          <th id="tituloTabla" class="text-center">Todos los pedidos</th>
+        </tr>
       </thead>
       <tbody id="tablaPedidos"></tbody>
     </table>
   </div>
-  <nav><ul id="pagination" class="pagination justify-content-center"></ul></nav>
-</div>
-<div id="toastContainer" class="position-fixed p-3 top-0 end-0"></div>
 
-<div id="alertaCancelado" class="d-none position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center bg-dark bg-opacity-75">
+  <nav class="mt-4">
+    <ul id="pagination" class="pagination justify-content-center"></ul>
+  </nav>
+</main>
+{% else %}
+<main class="container mt-5 flex-grow-1">
+    <div class="card shadow p-5 text-center border-0">
+        <h2 class="text-danger"><i class="bi bi-shield-lock-fill fs-1"></i><br>Acceso Denegado</h2>
+        <p class="lead">Solo el administrador puede gestionar los pedidos del sistema.</p>
+        <a href="{{ url_for('inicio') }}" class="btn btn-primary btn-lg mt-3">Regresar al Inicio</a>
+    </div>
+</main>
+<script>setTimeout(() => { window.location.href = "{{ url_for('inicio') }}"; }, 3000);</script>
+{% endif %}
+
+<div id="toastContainer" class="position-fixed p-3 top-0 end-0" style="z-index: 1080;"></div>
+
+<div id="alertaCancelado" class="d-none position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center bg-dark bg-opacity-75" style="z-index: 1090;">
   <div class="bg-white p-4 rounded shadow text-center">
   </div>
 </div>
 
-<div class="footer-container mt-5">
-<footer class="footer py-4">
-<div class="container footer-content d-flex flex-wrap justify-content-between align-items-start">
-    <div class="footer-section">
-        <h3>Contáctanos</h3>
-        <div class="info-item"><i class="bi bi-person-fill"></i> Nombre: Teresa Rubio García</div>
-        <div class="info-item"><i class="bi bi-telephone-fill"></i> Teléfono / WhatsApp: +57 3115699825</div>
-        <div class="info-item"><i class="bi bi-envelope-fill"></i> Correo: terugag@hotmail.com</div>
-        <div class="info-item"><i class="bi bi-geo-alt-fill"></i> Dirección: Carrera 4 #14-38 Urb. La Catalana - Chinácota - N.S</div>
-        <div class="info-item"><i class="bi bi-clock-fill"></i> Horarios de atención: Viernes a Domingo - Festivos a partir de las 9:00 AM - 6:00 PM</div>
-    </div>
-    <div class="footer-section">
-        <h5>Síganos en:</h5>
-        <a href="https://www.instagram.com/teresa.rubio.7311?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==" class="social-icon text-light"><i class="bi bi-instagram"></i></a>
-    </div>
-    <div class="footer-section text-center">
-        <h4>D'Antojitos</h4>
-        <a href="/pedidos_page"><img src="{{ url_for('static', filename='uploads/logo.ico') }}" alt="Logo" class="app-badge"></a>
-    </div>
-</div>
-<div class="text-center mt-3 footer-bottom">
-    <p>D'Antojitos 2025 © - Todos los derechos reservados</p>
-</div>
-</footer>
-</div>
+{% include 'footer.html' %}
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="{{ url_for('static', filename='js/pedidos.js') }}"></script>

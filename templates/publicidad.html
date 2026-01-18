@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema de Publicidad | D'Antojitos ©</title>
+<link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='uploads/icon.png') }}">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style_publicidad.css') }}">
+</head>
+<body>
+
+{% include 'navbar.html' %}
+
+<div class="main-content">
+    {% if session.get('user_id') and session.get('rol') == 'admin' %}
+    <div class="container-central">
+        <div class="card-title-marketing mb-4 text-center">
+            <h3><i class="bi bi-megaphone"></i> Sistema de Publicidad</h3>
+        </div>
+        
+        <div class="card mb-4 shadow-sm">
+            <div class="card-body">
+                <div class="card-title-marketing mb-4 border-bottom pb-2">
+                    <h3><i class="bi bi-bell"></i> Sistema de Notificaciones</h3>
+                </div>
+                <div class="row g-2">
+                    <div class="col-md-3">
+                        <div id="previewNotificacion" class="preview-img-box" style="display:none"><img id="previewNotificacionImg"></div>
+                        <input type="file" id="archivoNotificacion" class="form-control">
+                    </div>
+                    <div class="col-md-3"><input type="text" id="tituloNotificacion" class="form-control" placeholder="Título"></div>
+                    <div class="col-md-3"><input type="text" id="descNotificacion" class="form-control" placeholder="Descripción"></div>
+                    <div class="col-md-3"><button class="btn btn-info w-100 fw-bold" onclick="crearNotificacion()">Crear Notificación</button></div>
+                    <div class="col-md-12 mt-3">
+                        <h6 class="fw-bold">Alertas existentes</h6>
+                        <div id="contenedorAlertas" class="d-flex flex-column gap-2"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3 shadow-sm">
+            <div class="card-body">
+                <div class="card-title-marketing mb-4 border-bottom pb-2">
+                    <h3><i class="bi bi-image"></i> Sistema de Imágenes</h3>
+                </div>
+                <div class="row g-2">
+                    <div class="col-12 mb-2"><strong>Carrusel Principal</strong></div>
+                    <div id="carruselContainer" class="col-12"></div>
+                    <div class="col-12 mb-3"><button class="btn btn-primary w-100 fw-bold" onclick="agregarCarrusel()">+ Agregar Item al Carrusel</button></div>
+                    
+                    <div class="col-12 mb-2"><strong>Secciones Inferiores</strong></div>
+                    <div id="seccionesContainer" class="col-12"></div>
+                    <div class="col-12 mb-3"><button class="btn btn-primary w-100 fw-bold" onclick="agregarSeccion()">+ Agregar Nueva Sección</button></div>
+                    
+                    <div class="card-title-marketing mb-4 text-center mt-4 border-bottom pb-2">
+                        <h3><i class="bi bi-info-circle"></i> Información de Inicio</h3>
+                    </div>
+                    <textarea id="infoInicio" class="form-control mb-4" rows="3" oninput="actualizarPreview()" placeholder="Escribe la información..."></textarea>
+                    
+                    <button id="btnGuardarMarketing" class="btn btn-dark btn-lg w-100 fw-bold py-3" onclick="guardarMarketing()">
+                        <i class="bi bi-cloud-arrow-up-fill"></i> GUARDAR Y PUBLICAR CAMBIOS
+                    </button>
+                    
+                    <div class="col-md-12 mt-5">
+                        <h5 class="text-center text-muted"><i class="bi bi-eye"></i> Vista Previa en Tiempo Real</h5>
+                        <div id="previewInicio" class="p-4 border rounded bg-white shadow-sm mt-3">
+                            <div id="previewCarrusel" class="carousel slide mb-4" data-bs-ride="carousel">
+                                <div class="carousel-inner"></div>
+                            </div>
+                            <div id="previewSecciones" class="d-flex flex-wrap justify-content-center mb-4"></div>
+                            <div id="previewInfo" class="bg-light p-3 rounded text-center"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="container text-center mt-5">
+        <div class="card shadow p-5 border-0">
+            <h2 class="text-danger"><i class="bi bi-shield-lock-fill fs-1"></i><br>Acceso Denegado</h2>
+            <p class="lead">Solo el personal administrativo puede acceder.</p>
+            <a href="{{ url_for('inicio') }}" class="btn btn-primary btn-lg mt-3">Regresar al Inicio</a>
+        </div>
+    </div>
+    <script>setTimeout(() => { window.location.href = "{{ url_for('inicio') }}"; }, 3000);</script>
+    {% endif %}
+</div>
+
+{% include 'footer.html' %}
+
+<div id="toastContainer" class="position-fixed p-3 top-0 end-0" style="z-index: 1050"></div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{{ url_for('static', filename='js/publicidad.js') }}"></script>
+</body>
+</html>

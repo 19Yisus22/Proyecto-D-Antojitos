@@ -3,7 +3,7 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 from supabase import create_client
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
-import os, uuid, socket, secrets, logging, hashlib, websockets, cloudinary, cloudinary.uploader
+import os, uuid, socket, secrets, logging, hashlib, websockets, cloudinary, cloudinary.uploader, json
 
 # RUTAS Y DIRECTORIOS
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -119,7 +119,8 @@ def login():
     if not request.is_json:
         return jsonify({"ok": False, "error": "Content-Type application/json requerido"}), 415
     data = request.get_json()
-    correo, contrasena = data.get("correo", "").strip().lower(), data.get("contrasena", "")
+    correo = data.get("correo", "").strip().lower()
+    contrasena = data.get("contrasena", "")
 
     if not correo or not contrasena:
         return jsonify({"ok": False, "error": "Debes ingresar correo y contraseña"}), 400
@@ -133,35 +134,36 @@ def login():
         return jsonify({"ok": False, "error": "Correo o contraseña incorrectos"}), 401
     permisos_res = supabase.table("roles_permisos").select("permisos(nombre_permiso)").eq("id_role", user["id_role"]).execute()
     permisos = [p["permisos"]["nombre_permiso"] for p in permisos_res.data if p.get("permisos")]
-    session["user_id"], session["rol"], session["permisos"], session["just_logged_in"] = user["id_cliente"], user["roles"]["nombre_role"], permisos, True
+    session["user_id"] = user["id_cliente"]
+    session["rol"] = user["roles"]["nombre_role"]
+    session["permisos"] = permisos
+    session["user"] = user 
+    session["just_logged_in"] = True
     return jsonify({"ok": True, "redirect": "/inicio", "user": user, "permisos": permisos}), 200
 
 @app.route("/inicio")
 def inicio():
 
-    user, just_logged_in, pedidos_nuevos = None, False, False
     user_id = session.get("user_id")
 
     if not user_id:
         session.clear()
-        return render_template("inicio.html", user=None, just_logged_in=False, pedidos_nuevos=False)
+        return render_template("inicio.html", user=None)
     res = supabase.table("usuarios").select("*, roles(nombre_role)").eq("id_cliente", user_id).maybe_single().execute()
 
     if not res.data:
         session.clear()
-        return render_template("inicio.html", user=None, just_logged_in=False, pedidos_nuevos=False)
+        return render_template("inicio.html", user=None)
     user = res.data
-
-    if not user.get("imagen_url"):
-        user["imagen_url"] = "https://res.cloudinary.com/dmknjcrua/image/upload/v1755983018/defaults/default_icon_profile.png"
+    session["user"] = user
     just_logged_in = session.pop("just_logged_in", False)
     permisos_res = supabase.table("roles_permisos").select("permisos(nombre_permiso)").eq("id_role", user.get("id_role")).execute()
     user["permisos"] = [p["permisos"]["nombre_permiso"] for p in permisos_res.data if p.get("permisos")]
-    session["permisos"] = user["permisos"]
+    pedidos_nuevos = False
 
-    if user.get("roles", {}).get("nombre_role") == "admin" and "ver_pedidos" in user["permisos"]:
+    if user.get("roles", {}).get("nombre_role") == "admin":
         pedidos_res = supabase.table("pedidos").select("*").eq("estado", "nuevo").execute()
-        pedidos_nuevos = bool(pedidos_res.data) if pedidos_res.data else False
+        pedidos_nuevos = bool(pedidos_res.data)
     return render_template("inicio.html", user=user, just_logged_in=just_logged_in, pedidos_nuevos=pedidos_nuevos)
 
 @app.route("/registro", methods=["GET", "POST", "OPTIONS"])
@@ -214,6 +216,7 @@ def logout():
 
     session.clear()
     return jsonify({"success": True})
+
 
 # APARTADO DE PERFILES
 
@@ -346,6 +349,7 @@ def eliminar_usuario_por_correo():
     supabase.table("usuarios").delete().eq("correo", correo).execute()
     return jsonify({"ok": True})
 
+
 # APARTADO DE GESTION DE PRODUCTOS
 
 @app.route("/gestionar_productos_page", methods=["GET"])
@@ -439,6 +443,7 @@ def eliminar_producto(id_producto):
         delete_image_from_cloudinary(producto_actual["imagen_url"])
     supabase.table("gestion_productos").delete().eq("id_producto", id_producto).execute()
     return jsonify({"ok": True})
+
 
 # APARTADO DE CATALOGO
 
@@ -534,6 +539,7 @@ def guardar_catalogo():
     
     except Exception as e:
         return {"error": str(e)}, 500
+
 
 # CARRITO
 
@@ -847,13 +853,7 @@ def obtener_pedidos():
         return jsonify([]), 401
     pedidos_res = (
         supabase.table("pedidos")
-        .select(
-            """
-            *,
-            usuarios(id_cliente, nombre, apellido, cedula, metodo_pago, imagen_url),
-            pedido_detalle(*, gestion_productos(nombre, precio, imagen_url))
-            """
-        )
+        .select("""*, usuarios(id_cliente, nombre, apellido, cedula, metodo_pago, imagen_url), pedido_detalle(*, gestion_productos(nombre, precio, imagen_url))""")
         .order("fecha_pedido", desc=True)
         .execute()
     )
@@ -981,6 +981,7 @@ def eliminar_pedido(id_pedido):
         return jsonify({"success": False, "message": "No se eliminó el pedido"}), 400
     return jsonify({"success": True, "message": "Pedido eliminado correctamente"})
 
+
 # APARTADO DE COMENTARIOS
 
 @app.route("/comentarios_page", methods=["GET"])
@@ -1093,6 +1094,189 @@ def eliminar_comentario(id):
     supabase.table("comentarios").delete().eq("id", id).execute()
     return jsonify({"ok": True})
 
+
+# APARTADO DE SISTEMA DE PUBLICIDAD
+
+@app.route("/publicidad_page", methods=["GET", "POST"])
+def publicidad_page():
+
+    user_id = session.get("user_id")
+
+    if not user_id:
+        return jsonify({"ok": False, "error": "No autorizado"}), 401
+    
+    if request.method == "POST":
+        subtitulo = request.form.get("subtitulo", "").strip()
+        carrusel_data = json.loads(request.form.get("metadata_carrusel", "[]"))
+        secciones_data = json.loads(request.form.get("metadata_secciones", "[]"))
+        res_actual = supabase.table("publicidad").select("img").eq("tipo", "general").execute()
+        urls_viejas = []
+
+        if res_actual.data:
+            img_data = res_actual.data[0].get("img", {})
+            if isinstance(img_data, str): img_data = json.loads(img_data)
+            for c in img_data.get("carrusel", []): 
+                if c.get("url"): urls_viejas.append(c.get("url"))
+            for s in img_data.get("secciones", []): 
+                if s.get("url"): urls_viejas.append(s.get("url"))
+
+        def procesar(metadata_list, file_key):
+
+            files = request.files.getlist(file_key)
+            file_idx = 0
+
+            for item in metadata_list:
+                if item.get("has_new") and file_idx < len(files):
+                    if item.get("url"):
+                        delete_image_from_cloudinary(item.get("url"))
+                    f = files[file_idx]
+                    if f:
+                        item["url"] = upload_image_to_cloudinary(f, folder="publicidad_DAntojitos")
+                    file_idx += 1
+                if "has_new" in item: del item["has_new"]
+            return metadata_list
+        
+        carrusel_final = procesar(carrusel_data, "imagenes_carrusel")
+        secciones_final = procesar(secciones_data, "imagenes_secciones")
+        urls_nuevas = [c["url"] for c in carrusel_final if c.get("url")] + [s["url"] for s in secciones_final if s.get("url")]
+        
+        for url in urls_viejas:
+            if url and url not in urls_nuevas:
+                delete_image_from_cloudinary(url)
+
+        record = {
+            "titulo": "Publicidad General",
+            "subtitulo": subtitulo,
+            "tipo": "general",
+            "img": {"carrusel": carrusel_final, "secciones": secciones_final},
+            "estado": True
+        }
+
+        resp = supabase.table("publicidad").select("id_publicidad").eq("tipo", "general").execute()
+
+        if resp.data:
+            supabase.table("publicidad").update(record).eq("id_publicidad", resp.data[0]["id_publicidad"]).execute()
+
+        else:
+            supabase.table("publicidad").insert(record).execute()
+        return jsonify({"ok": True, "msg": "Publicidad actualizada"})
+
+    res = supabase.table("publicidad").select("*").eq("tipo", "general").execute()
+    publicidad = res.data[0] if res.data else {}
+    return render_template("publicidad.html", publicidad=publicidad)
+
+@app.route("/api/publicidad/activa", methods=["GET"])
+def obtener_publicidad_activa():
+
+    user_id = session.get("user_id")
+
+    if not user_id:
+        return jsonify({"error": "Usuario no autenticado"}), 401
+    resp = supabase.table("publicidad").select("*").eq("tipo", "general").eq("estado", True).execute()
+
+    if resp.data:
+
+        pub = resp.data[0]
+        imagenes = pub.get("img", {})
+
+        if isinstance(imagenes, str): imagenes = json.loads(imagenes)
+        return jsonify({
+            "subtitulo": pub.get("subtitulo"),
+            "metadata_carrusel": imagenes.get("carrusel", []),
+            "metadata_secciones": imagenes.get("secciones", [])
+        })
+    
+    return jsonify({})
+
+@app.route("/api/admin/notificaciones", methods=["GET", "POST"])
+def admin_notificaciones():
+
+    user_id = session.get("user_id")
+
+    if not user_id:
+        return jsonify({"error": "Usuario no autenticado"}), 401
+    
+    if request.method == "POST":
+        titulo = request.form.get("titulo")
+        descripcion = request.form.get("descripcion")
+        archivo = request.files.get("archivo")
+        url = upload_image_to_cloudinary(archivo, folder="publicidad_DAntojitos") if archivo else ""
+        record = {
+            "titulo": "Publicidad",
+            "titulo_publicidad": titulo,
+            "tipo": "notificacion",
+            "descripcion_publicidad": descripcion,
+            "img": [url] if url else [],
+            "estado": True
+        }
+        supabase.table("publicidad").insert(record).execute()
+        return jsonify({"ok": True, "msg": "Creada"})
+
+    resp = supabase.table("publicidad").select("*").eq("tipo", "notificacion").order("fecha_creacion", desc=True).execute()
+    notificaciones = []
+
+    for r in resp.data:
+
+        imgs = r["img"]
+        
+        if isinstance(imgs, str): imgs = json.loads(imgs)
+        notificaciones.append({
+            "id_notificacion": r["id_publicidad"],
+            "titulo": r["titulo_publicidad"],
+            "descripcion": r["descripcion_publicidad"],
+            "imagen_url": imgs[0] if imgs else ""})
+    return jsonify(notificaciones)
+
+@app.route("/api/admin/notificaciones/<id_notificacion>", methods=["PUT", "DELETE"])
+def admin_gestion_notificacion(id_notificacion):
+
+    user_id = session.get("user_id")
+
+    if not user_id:
+        return jsonify({"error": "Usuario no autenticado"}), 401
+    res = supabase.table("publicidad").select("img").eq("id_publicidad", id_notificacion).execute()
+    url_actual = ""
+
+    if res.data:
+
+        imgs = res.data[0]["img"]
+
+        if isinstance(imgs, str): imgs = json.loads(imgs)
+        if imgs and isinstance(imgs, list): url_actual = imgs[0]
+
+    if request.method == "DELETE":
+        if url_actual: delete_image_from_cloudinary(url_actual)
+        supabase.table("publicidad").delete().eq("id_publicidad", id_notificacion).execute()
+        return jsonify({"ok": True})
+
+    if request.method == "PUT":
+        update_data = {
+            "titulo_publicidad": request.form.get("titulo"),
+            "descripcion_publicidad": request.form.get("descripcion")}
+        archivo = request.files.get("archivo")
+
+        if archivo:
+            
+            if url_actual: delete_image_from_cloudinary(url_actual)
+            nueva_url = upload_image_to_cloudinary(archivo, folder="publicidad_DAntojitos")
+            update_data["img"] = [nueva_url]
+        supabase.table("publicidad").update(update_data).eq("id_publicidad", id_notificacion).execute()
+        return jsonify({"ok": True})
+
+@app.route("/api/admin/publicidad/eliminar_img", methods=["POST"])
+def eliminar_imagen_suelta():
+
+    user_id = session.get("user_id")
+
+    if not user_id:
+        return jsonify({"error": "Usuario no autenticado"}), 401
+    url = request.get_json().get("url")
+    
+    if url:
+        delete_image_from_cloudinary(url)
+        return jsonify({"ok": True})
+    return jsonify({"ok": False}), 400
+
 # APARTADO DEL APP RUN
 
 def get_local_ip():
@@ -1116,7 +1300,7 @@ if __name__ == "__main__":
     port = 8000
     local_ip = get_local_ip()
 
-    debug_mode = False       
+    debug_mode = True       
 
     if debug_mode:
         print("⚡ Ejecutando en modo DEBUG con servidor de desarrollo de Flask")

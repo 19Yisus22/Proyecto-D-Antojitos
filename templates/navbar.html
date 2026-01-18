@@ -6,8 +6,7 @@
       <img src="/static/uploads/logo.ico" alt="Logo" width="90" height="auto" style="object-fit:contain;">
       <span class="ms-2">D'Antojitos</span>
     </a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
-      aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
       <span class="navbar-toggler-icon"></span>
     </button>
     <div class="collapse navbar-collapse" id="navbarNav">
@@ -18,57 +17,34 @@
         <li class="nav-item"><a class="nav-link py-1" href="/comentarios_page">Sugerencias</a></li>
       </ul>
 
-      {% if user %}
+      {% if session.get('user') %}
       <ul class="navbar-nav ms-auto">
         <li class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle d-flex align-items-center py-1" href="#" id="perfilDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-            <img src="{{ user.imagen_url or url_for('static', filename='uploads/default_icon_profile.png') }}" alt="Perfil" class="rounded-circle" width="35" height="35" style="object-fit:cover;">
-            <span class="ms-2">{{ user.nombre }}</span>
+          <a class="nav-link dropdown-toggle d-flex align-items-center py-1" href="#" id="perfilDropdown" role="button" data-bs-toggle="dropdown">
+            <img src="{{ session.user.imagen_url or url_for('static', filename='uploads/default_icon_profile.png') }}" alt="Perfil" class="rounded-circle" width="35" height="35" style="object-fit:cover;">
+            <span class="ms-2">{{ session.user.nombre }}</span>
           </a>
-          <ul class="dropdown-menu dropdown-menu-end animate__animated animate__fadeIn" aria-labelledby="perfilDropdown">
-            <li><a class="dropdown-item" href="/mi_perfil">Ir a Perfil</a></li>
-
-            {% if 'gestionar_productos' in user.permisos %}
-            <li><a class="dropdown-item" href="/gestionar_productos_page">Gestionar Productos</a></li>
+          <ul class="dropdown-menu dropdown-menu-end animate__animated animate__fadeIn">
+            <li><a class="dropdown-item" href="/mi_perfil"><i class="bi bi-person"></i> Mi Perfil</a></li>
+            {% if session.get('rol') == 'admin' %}
+              <li><hr class="dropdown-divider"></li>
+              <li class="dropdown-header text-uppercase small fw-bold text-primary">Panel Administrativo</li>
+              <li><a class="dropdown-item" href="/gestionar_productos_page"><i class="bi bi-box-seam"></i> Gestionar Productos</a></li>
+              <li><a class="dropdown-item" href="/pedidos_page"><i class="bi bi-clipboard-check"></i> Gestionar Pedidos</a></li>
+              <li><a class="dropdown-item" href="/publicidad_page"><i class="bi bi-megaphone"></i> Sistema de Publicidad</a></li>
             {% endif %}
-
-            {% if 'procesar_pedidos' in user.permisos %}
-            <li><a class="dropdown-item" href="/pedidos_page">Gestionar Pedidos</a></li>
-            {% endif %}
-
             <li><hr class="dropdown-divider"></li>
-            <li><button class="dropdown-item text-danger" id="btnCerrarSesionDropdown">Cerrar sesión</button></li>
+            <li><button class="dropdown-item text-danger" id="btnCerrarSesionDropdown"><i class="bi bi-box-arrow-right"></i> Cerrar sesión</button></li>
           </ul>
         </li>
       </ul>
       {% else %}
-      {% if request.path == '/inicio' %}
       <ul class="navbar-nav ms-auto">
-        <li class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle py-1" href="#" id="loginDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-            Iniciar Sesión
-          </a>
-          <ul class="dropdown-menu dropdown-menu-end animate__animated animate__fadeIn" aria-labelledby="loginDropdown">
-            <li><a class="dropdown-item" href="/login">Login</a></li>
-          </ul>
+        <li class="nav-item">
+          <a class="nav-link py-1 fw-bold" href="/login"><i class="bi bi-box-arrow-in-right"></i> Iniciar Sesión</a>
         </li>
       </ul>
-      {% endif %}
       {% endif %}
     </div>
   </div>
 </nav>
-
-<script>
-document.getElementById("btnCerrarSesionDropdown")?.addEventListener("click", () => {
-  fetch('/logout', { method: 'POST' })
-  .then(res => res.json())
-  .then(data => {
-    if(data.success){
-      window.location.href = "/inicio";
-    } else {
-      alert('Error al cerrar sesión');
-    }
-  });
-});
-</script>
