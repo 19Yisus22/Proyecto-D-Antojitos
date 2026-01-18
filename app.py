@@ -211,11 +211,11 @@ def registro():
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 400
     
-@app.route("/logout", methods=["POST"])
+@app.route("/logout")
 def logout():
 
     session.clear()
-    return jsonify({"success": True})
+    return redirect(url_for('index'))
 
 
 # APARTADO DE PERFILES
@@ -436,6 +436,7 @@ def eliminar_producto(id_producto):
 
     if not user_id:
         return jsonify({"ok": False, "error": "No autorizado"}), 401
+    
     res_producto = supabase.table("gestion_productos").select("*").eq("id_producto", id_producto).single().execute()
     producto_actual = res_producto.data
 
@@ -497,6 +498,7 @@ def guardar_catalogo():
 
         if not user_id:
             return {"error": "Usuario no autenticado"}, 401
+        
         data = request.json
         productos = data.get("productos", [])
 
@@ -558,6 +560,7 @@ def obtener_carrito():
 
     if not user_id:
         return jsonify({"productos": []})
+    
     carrito_res = supabase.table("carrito").select("*").eq("id_cliente", user_id).execute()
     carrito = carrito_res.data or []
     ids_productos = [item["id_producto"] for item in carrito]
@@ -587,6 +590,7 @@ def agregar_al_carrito():
 
     if not id_cliente:
         return {"error": "Inicie sesión para agregar productos al carrito"}, 401
+    
     data = request.json
     productos = data.get("productos", [])
     
@@ -657,6 +661,7 @@ def carrito_quitar(id_carrito):
 
     if not user_id:
         return jsonify({"ok": False, "message": "Debe iniciar sesión"}), 401
+    
     carrito_item_res = supabase.table("carrito").select("*").eq("id_carrito", id_carrito).single().execute()
     item = carrito_item_res.data
 
@@ -680,6 +685,7 @@ def finalizar_compra():
 
     if not user_id:
         return jsonify({"message": "Debe iniciar sesión"}), 401
+    
     usuario_res = supabase.table("usuarios").select("nombre, apellido, cedula, direccion, metodo_pago, telefono, correo").eq("id_cliente", user_id).single().execute()
     usuario = usuario_res.data
 
@@ -803,6 +809,11 @@ def buscar_facturas():
 @app.route("/facturas/<uuid:id_factura>/anular", methods=["PUT"])
 def anular_factura(id_factura):
 
+    user_id = session.get("user_id")
+
+    if not user_id:
+        return jsonify({"message": "Debe iniciar sesión"}), 401
+    
     factura_res = supabase.table("facturas").select("id_pedido").eq("id_factura", str(id_factura)).limit(1).execute()
 
     if not factura_res.data:
@@ -851,6 +862,7 @@ def obtener_pedidos():
 
     if not user_id:
         return jsonify([]), 401
+    
     pedidos_res = (
         supabase.table("pedidos")
         .select("""*, usuarios(id_cliente, nombre, apellido, cedula, metodo_pago, imagen_url), pedido_detalle(*, gestion_productos(nombre, precio, imagen_url))""")
@@ -882,6 +894,7 @@ def enviar_pedido():
 
     if not user_id:
         return jsonify({"message": "Usuario no autenticado"}), 401
+    
     usuario_res = supabase.table("usuarios").select("nombre, apellido, direccion, metodo_pago").eq("id_cliente", user_id).single().execute()
     usuario = usuario_res.data or {}
     direccion = usuario.get("direccion", "")
@@ -924,6 +937,7 @@ def actualizar_estado(id_pedido):
 
     if not user_id:
         return jsonify({"error": "Usuario no autenticado"}), 401
+    
     data = request.get_json()
     nuevo_estado = data.get("estado")
     pedido_res = supabase.table("pedidos").select("*").eq("id_pedido", str(id_pedido)).single().execute()
@@ -948,6 +962,7 @@ def actualizar_pago(id_pedido):
 
     if not user_id:
         return jsonify({"error": "Usuario no autenticado"}), 401
+    
     data = request.get_json()
     pagado = data.get("pagado")
 
@@ -975,6 +990,7 @@ def eliminar_pedido(id_pedido):
 
     if not user_id:
         return jsonify({"success": False, "message": "Usuario no autenticado"}), 401
+    
     res = supabase.table("pedidos").delete().eq("id_pedido", str(id_pedido)).execute()
 
     if res.data is None:
@@ -991,6 +1007,7 @@ def comentarios_page():
 
     if not user_id:
         return redirect(url_for("login"))
+    
     res_usuario = supabase.table("usuarios").select("id_cliente,nombre,apellido,imagen_url").eq("id_cliente", user_id).single().execute()
     user = res_usuario.data
 
@@ -1039,6 +1056,7 @@ def crear_comentario():
 
     if "user_id" not in session:
         return jsonify({"error": "Usuario no autenticado"}), 401
+    
     data = request.get_json()
     mensaje = data.get("mensaje", "").strip()
 
@@ -1062,6 +1080,7 @@ def editar_comentario(id):
 
     if "user_id" not in session:
         return jsonify({"error": "Usuario no autenticado"}), 401
+    
     data = request.get_json()
     mensaje = data.get("mensaje", "").strip()
 
@@ -1083,6 +1102,7 @@ def eliminar_comentario(id):
 
     if "user_id" not in session:
         return jsonify({"error": "Usuario no autenticado"}), 401
+    
     comentario_res = supabase.table("comentarios").select("*").eq("id", id).single().execute()
     comentario = comentario_res.data
 
@@ -1099,11 +1119,6 @@ def eliminar_comentario(id):
 
 @app.route("/publicidad_page", methods=["GET", "POST"])
 def publicidad_page():
-
-    user_id = session.get("user_id")
-
-    if not user_id:
-        return jsonify({"ok": False, "error": "No autorizado"}), 401
     
     if request.method == "POST":
         subtitulo = request.form.get("subtitulo", "").strip()
@@ -1168,14 +1183,9 @@ def publicidad_page():
 @app.route("/api/publicidad/activa", methods=["GET"])
 def obtener_publicidad_activa():
 
-    user_id = session.get("user_id")
-
-    if not user_id:
-        return jsonify({"error": "Usuario no autenticado"}), 401
     resp = supabase.table("publicidad").select("*").eq("tipo", "general").eq("estado", True).execute()
 
     if resp.data:
-
         pub = resp.data[0]
         imagenes = pub.get("img", {})
 

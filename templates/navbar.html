@@ -14,7 +14,7 @@
         <li class="nav-item"><a class="nav-link py-1" href="/inicio">Inicio</a></li>
         <li class="nav-item"><a class="nav-link py-1" href="/catalogo_page">Catálogo</a></li>
         <li class="nav-item"><a class="nav-link py-1" href="/carrito_page">Carrito</a></li>
-        <li class="nav-item"><a class="nav-link py-1" href="/comentarios_page">Sugerencias</a></li>
+        <li class="nav-item"><a class="nav-link py-1" href="/comentarios_page">Comentarios / Sugerencias</a></li>
       </ul>
 
       {% if session.get('user') %}
@@ -34,7 +34,7 @@
               <li><a class="dropdown-item" href="/publicidad_page"><i class="bi bi-megaphone"></i> Sistema de Publicidad</a></li>
             {% endif %}
             <li><hr class="dropdown-divider"></li>
-            <li><button class="dropdown-item text-danger" id="btnCerrarSesionDropdown"><i class="bi bi-box-arrow-right"></i> Cerrar sesión</button></li>
+            <li><a class="dropdown-item text-danger" href="/logout"><i class="bi bi-box-arrow-right"></i> Cerrar sesión</a></li>
           </ul>
         </li>
       </ul>

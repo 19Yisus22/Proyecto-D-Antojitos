@@ -78,17 +78,20 @@
             </div>
         </div>
     </div>
-    {% else %}
-    <div class="container text-center mt-5">
-        <div class="card shadow p-5 border-0">
-            <h2 class="text-danger"><i class="bi bi-shield-lock-fill fs-1"></i><br>Acceso Denegado</h2>
-            <p class="lead">Solo el personal administrativo puede acceder.</p>
-            <a href="{{ url_for('inicio') }}" class="btn btn-primary btn-lg mt-3">Regresar al Inicio</a>
-        </div>
-    </div>
-    <script>setTimeout(() => { window.location.href = "{{ url_for('inicio') }}"; }, 3000);</script>
-    {% endif %}
 </div>
+
+{% else %}
+<main class="container mt-5 flex-grow-1">
+    <div class="card shadow p-5 text-center border-0">
+        <h2 class="text-danger"><i class="bi bi-shield-lock-fill fs-1"></i><br>Acceso Denegado</h2>
+        <p class="lead">Solo el personal administrativo puede gestionar los productos.</p>
+        <a href="{{ url_for('inicio') }}" class="btn btn-primary btn-lg mt-3">Regresar al Inicio</a>
+    </div>
+</main>
+<script>setTimeout(() => { window.location.href = "{{ url_for('inicio') }}"; }, 3000);</script>
+{% endif %}
+
+<div id="toastContainer" class="position-fixed top-0 start-0 p-3" style="z-index: 1080;"></div>
 
 {% include 'footer.html' %}
 

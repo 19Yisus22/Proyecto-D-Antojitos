@@ -36,9 +36,8 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-  window.userLogged = {{ 'true' if session.get('user_id') else 'false' }};
+  window.userLogged = "{{ 'true' if session.get('user') else 'false' }}" === "true";
 </script>
 <script src="{{ url_for('static', filename='js/catalogo.js') }}"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
