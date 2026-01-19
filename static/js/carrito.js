@@ -1,296 +1,215 @@
-let facturasActuales = []
-let paginaActual = 1
-const itemsPorPagina = 5
+let facturasActuales = [];
+let paginaActual = 1;
+const itemsPorPagina = 5;
 
 function showMessage(msg, isError = false) {
-    const toastContainer = document.getElementById('toastContainer')
-    const toastEl = document.createElement('div')
-    toastEl.className = 'toast align-items-center text-bg-light border-0'
-    toastEl.setAttribute('role', 'alert')
-    toastEl.setAttribute('aria-live', 'assertive')
-    toastEl.setAttribute('aria-atomic', 'true')
-    toastEl.innerHTML = `<div class="d-flex"><div class="toast-body">${isError ? '❌' : '✅'} ${msg}</div><button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div>`
-    toastContainer.appendChild(toastEl)
-    new bootstrap.Toast(toastEl, { delay: 1500 }).show()
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = 'custom-toast';
+    toast.innerHTML = `
+        <div class="d-flex align-items-center">
+            <i class="bi ${isError ? 'bi-x-circle text-danger' : 'bi-check-circle text-success'} me-3 fs-5"></i>
+            <span>${msg}</span>
+        </div>
+        <i class="bi bi-x-lg ms-3 btn-close-toast" style="cursor:pointer; font-size: 0.7rem;"></i>
+    `;
+    container.appendChild(toast);
+    const remove = () => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 400);
+    };
+    toast.querySelector('.btn-close-toast').onclick = remove;
+    setTimeout(remove, 3500);
 }
 
-function mostrarModalUsuario(usuario) {
-    const modalEl = document.createElement("div")
-    modalEl.className = "modal fade"
-    modalEl.tabIndex = -1
+function mostrarModalUsuario(u) {
+    const modalEl = document.createElement("div");
+    modalEl.className = "modal fade";
     modalEl.innerHTML = `
         <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content p-3">
-                <div class="modal-header">
-                    <h5 class="modal-title">Información del Usuario</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body text-center">
-                    <img src="${usuario.imagen_usuario || 'https://via.placeholder.com/120'}" class="rounded-circle mb-3" width="120" height="120" style="object-fit:cover;">
-                    <div class="card p-3">
-                        <p><strong>Nombre:</strong> ${usuario.nombre_cliente || ''}</p>
-                        <p><strong>Teléfono:</strong> ${usuario.telefono || ''}</p>
-                        <p><strong>Correo:</strong> ${usuario.correo || ''}</p>
+            <div class="modal-content border-0 rounded-4">
+                <div class="modal-body text-center p-4">
+                    <img src="${u.imagen_usuario || 'https://via.placeholder.com/100'}" class="rounded-circle mb-3 shadow-sm" width="100" height="100" style="object-fit:cover;">
+                    <h5 class="fw-bold mb-1">${u.nombre_cliente}</h5>
+                    <p class="text-muted small mb-3">${u.correo}</p>
+                    <div class="text-start bg-light p-3 rounded-3">
+                        <p class="mb-1 small"><strong>Cédula:</strong> ${u.cedula}</p>
+                        <p class="mb-0 small"><strong>Teléfono:</strong> ${u.telefono}</p>
                     </div>
                 </div>
             </div>
-        </div>
-    `
-    document.body.appendChild(modalEl)
-    const modal = new bootstrap.Modal(modalEl)
-    modal.show()
-    modalEl.addEventListener("hidden.bs.modal", () => modalEl.remove())
+        </div>`;
+    document.body.appendChild(modalEl);
+    const m = new bootstrap.Modal(modalEl);
+    m.show();
+    modalEl.addEventListener("hidden.bs.modal", () => modalEl.remove());
 }
-
-function mostrarModalProducto(producto) {
-    const modalEl = document.createElement("div")
-    modalEl.className = "modal fade"
-    modalEl.tabIndex = -1
-    modalEl.innerHTML = `
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content p-3">
-                <div class="modal-header">
-                    <h5 class="modal-title">Información del Producto</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body text-center">
-                    <img src="${producto.imagen || 'https://via.placeholder.com/200'}" class="mb-3" width="200" height="200" style="object-fit:cover;">
-                    <div class="card p-3">
-                        <p><strong>Nombre:</strong> ${producto.nombre_producto || ''}</p>
-                        <p><strong>Descripción:</strong> ${producto.descripcion || 'Sin descripción disponible'}</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `
-    document.body.appendChild(modalEl)
-    const modal = new bootstrap.Modal(modalEl)
-    modal.show()
-    modalEl.addEventListener("hidden.bs.modal", () => modalEl.remove())
-}
-
-function mostrarFactura(data, mostrarFoto = false) {
-    const contenedor = document.getElementById("facturaContainer")
-    const productos = data.productos || []
-    const div = document.createElement("div")
-    div.className = "card mb-3 p-3"
-    let filas = ""
-    let totalSubtotal = 0
-    productos.forEach(p => {
-        const subtotal = Number(p.subtotal || 0)
-        totalSubtotal += subtotal
-        filas += `<tr>
-            <td>${p.nombre_producto}</td>
-            <td>x${p.cantidad}</td>
-            <td>${subtotal.toLocaleString('es-CO',{style:'currency',currency:'COP'})}</td>
-        </tr>`
-    })
-    div.innerHTML = `
-        <div class="d-flex align-items-center mb-2">
-            ${mostrarFoto?`<img src="${data.imagen_usuario||'https://via.placeholder.com/60'}" class="rounded-circle me-3 perfil-click" width="60" height="60" style="cursor:pointer;">`:''}
-            <div>
-                <strong>#${data.id_pedido||'N/A'}</strong><br>
-                Cliente: ${data.nombre_cliente||''}<br>
-                Cédula: ${data.cedula||''}<br>
-                Dirección: ${data.direccion_entrega||''}<br>
-            </div>
-        </div>
-        <table class="table table-sm table-bordered text-center">
-            <thead class="table-dark">
-                <tr><th>Producto</th><th>Cantidad</th><th>Subtotal</th></tr>
-            </thead>
-            <tbody>${filas}</tbody>
-        </table>
-        <p class="text-end fw-bold">Total: ${totalSubtotal.toLocaleString('es-CO',{style:'currency',currency:'COP'})}</p>
-        <p><strong>Método de Pago:</strong> ${data.metodo_pago||''}</p>
-    `
-    contenedor.prepend(div)
-    const fotoPerfil = div.querySelector(".perfil-click")
-    if(fotoPerfil){fotoPerfil.addEventListener("click",()=>mostrarModalUsuario(data))}
-}
-
-async function generarFactura() {
-    try {
-        const res = await fetch("/finalizar_compra",{method:"POST"})
-        const data = await res.json()
-        if(res.ok){
-            showMessage(data.message||"Pedido Enviado")
-            mostrarFactura(data,false)
-            cargarCarrito()
-        } else showMessage(data.message||"Error al finalizar compra",true)
-    } catch(e){showMessage("Error al finalizar compra",true)}
-}
-document.getElementById("btnFinalizarCompra").addEventListener("click",generarFactura)
 
 async function cargarCarrito() {
-    const contenedor=document.getElementById("carritoContainer")
-    const botonFinal=document.getElementById("btnFinalizarCompra")
-    contenedor.innerHTML=""
-    botonFinal.style.display="none"
-    try{
-        const res=await fetch("/obtener_carrito")
-        if(res.status===401||res.status===403){
-            contenedor.innerHTML='<p class="text-center fw-bold fs-4 mt-4 text-danger">Inicie sesión para ver su carrito</p>'
-            document.querySelectorAll("button,input,textarea").forEach(el=>el.disabled=true)
-            return
+    const container = document.getElementById("carritoContainer");
+    const btn = document.getElementById("btnFinalizarCompra");
+    container.innerHTML = "";
+    btn.style.display = "none";
+    try {
+        const res = await fetch("/obtener_carrito");
+        if (!res.ok) {
+            container.innerHTML = '<p class="p-5 text-center fw-bold">No se pudo cargar el carrito.</p>';
+            return;
         }
-        const data=await res.json()
-        if(!data.productos||data.productos.length===0){
-            contenedor.innerHTML='<p class="text-center fw-bold fs-4 mt-4 text-danger">El carrito está vacío</p>'
-            return
+        const data = await res.json();
+        if (!data.productos || data.productos.length === 0) {
+            container.innerHTML = '<div class="p-5 text-center text-muted"><i class="bi bi-cart-x fs-1"></i><p class="mt-2">El carrito está vacío</p></div>';
+            return;
         }
-        const productosAgrupados={}
-        data.productos.forEach(item=>{
-            if(productosAgrupados[item.id_producto]) productosAgrupados[item.id_producto].cantidad+=item.cantidad
-            else productosAgrupados[item.id_producto]={...item}
-        })
-        const tabla=document.createElement("table")
-        tabla.className="table table-bordered text-center align-middle"
-        tabla.innerHTML=`<thead class="table-dark"><tr><th>Producto</th><th>Cantidad</th><th>Precio Unitario</th><th>Subtotal</th><th>Acciones</th></tr></thead><tbody></tbody><tfoot><tr><th colspan="3" class="text-end">Total</th><th id="totalCarrito">COP 0</th><th></th></tr></tfoot>`
-        contenedor.appendChild(tabla)
-        const tbody=tabla.querySelector("tbody")
-        let total=0
-        Object.values(productosAgrupados).forEach(item=>{
-            const subtotal=Number(item.precio_unitario||0)*Number(item.cantidad||0)
-            total+=subtotal
-            const tr=document.createElement("tr")
-            tr.dataset.id=item.id_carrito
-            tr.innerHTML=`<td class="d-flex flex-column align-items-center"><img src="${item.imagen||'https://via.placeholder.com/70'}" class="img-preview mb-1 producto-click" alt="${item.nombre_producto}" width="70" height="70" style="cursor:pointer;"><div>${item.nombre_producto}</div></td><td>x${item.cantidad}</td><td>${Number(item.precio_unitario).toLocaleString('es-CO',{style:'currency',currency:'COP'})}</td><td>${subtotal.toLocaleString('es-CO',{style:'currency',currency:'COP'})}</td><td><button class="btn btn-danger btn-sm btn-quitar">Eliminar Items</button></td>`
-            tr.querySelector(".btn-quitar").addEventListener("click",async()=>{
-                const delRes=await fetch(`/carrito_quitar/${item.id_carrito}`,{method:"DELETE"})
-                if(delRes.ok){
-                    tr.remove()
-                    showMessage("Productos eliminados")
-                    if(tbody.children.length===0){
-                        contenedor.innerHTML='<p class="text-center fw-bold fs-4 mt-4 text-danger">Su carrito está vacío</p>'
-                        botonFinal.style.display="none"
-                    } else{
-                        let nuevoTotal=0
-                        Array.from(tbody.children).forEach(r=>{nuevoTotal+=Number(r.children[3].textContent.replace(/[^\d]/g,''))})
-                        document.getElementById("totalCarrito").textContent=nuevoTotal.toLocaleString('es-CO',{style:'currency',currency:'COP'})
-                    }
-                } else showMessage("No se pudo eliminar el producto",true)
-            })
-            tr.querySelector(".producto-click").addEventListener("click",()=>mostrarModalProducto(item))
-            tbody.appendChild(tr)
-        })
-        document.getElementById("totalCarrito").textContent=total.toLocaleString('es-CO',{style:'currency',currency:'COP'})
-        botonFinal.style.display="block"
-    }catch(e){contenedor.innerHTML='<p class="text-center fw-bold fs-4 mt-4 text-danger">Error al cargar el carrito. Intente nuevamente.</p>'}
+
+        let totalGeneral = 0;
+        const tabla = document.createElement("table");
+        tabla.className = "table align-middle mb-0 fade-in-item";
+        tabla.innerHTML = `
+            <thead><tr><th class="ps-4">Producto</th><th>Cantidad</th><th>Unitario</th><th>Subtotal</th><th class="text-center">Acción</th></tr></thead>
+            <tbody></tbody>
+            <tfoot class="table-light">
+                <tr>
+                    <td colspan="3" class="text-end fw-bold py-3">Total del Pedido:</td>
+                    <td colspan="2" class="ps-3 py-3 fw-bold fs-5 text-primary" id="totalCarritoFinal"></td>
+                </tr>
+            </tfoot>`;
+        
+        container.appendChild(tabla);
+        const tbody = tabla.querySelector("tbody");
+
+        data.productos.forEach(item => {
+            const sub = Number(item.precio_unitario) * Number(item.cantidad);
+            totalGeneral += sub;
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td class="ps-4 py-3">
+                    <div class="d-flex align-items-center">
+                        <img src="${item.imagen || 'https://via.placeholder.com/50'}" class="img-preview me-3" width="45" height="45" style="object-fit:cover; border-radius: 8px;">
+                        <strong>${item.nombre_producto}</strong>
+                    </div>
+                </td>
+                <td><span class="badge bg-light text-dark border">x${item.cantidad}</span></td>
+                <td>${Number(item.precio_unitario).toLocaleString('es-CO',{style:'currency',currency:'COP'})}</td>
+                <td>${sub.toLocaleString('es-CO',{style:'currency',currency:'COP'})}</td>
+                <td class="text-center"><button class="btn btn-sm btn-outline-danger btn-quitar"><i class="bi bi-trash"></i></button></td>`;
+            
+            tr.querySelector(".btn-quitar").onclick = async () => {
+                const r = await fetch(`/carrito_quitar/${item.id_carrito}`, { method: "DELETE" });
+                if (r.ok) { showMessage("Eliminado"); cargarCarrito(); }
+            };
+            tbody.appendChild(tr);
+        });
+
+        document.getElementById("totalCarritoFinal").textContent = totalGeneral.toLocaleString('es-CO',{style:'currency',currency:'COP'});
+        btn.style.display = "inline-block";
+    } catch(e) { container.innerHTML = '<p class="p-5 text-center">Error de servidor.</p>'; }
 }
 
-document.getElementById("buscarFactura").addEventListener("input",async function(){
-    const query=this.value.trim()
-    if(query.length===0){facturasActuales=[];mostrarFacturas();return}
-    try{
-        const res=await fetch(`/buscar_facturas?cedula=${encodeURIComponent(query)}`)
-        if(res.ok){
-            let data=await res.json()
-            facturasActuales=(data||[]).sort((a,b)=>new Date(b.fecha_emision)-new Date(a.fecha_emision))
-            paginaActual=1
-            mostrarFacturasBuscadas()
-        } else{facturasActuales=[];mostrarFacturasBuscadas();showMessage("No se pudieron obtener facturas",true)}
-    }catch(e){facturasActuales=[];mostrarFacturasBuscadas();showMessage("Error al buscar facturas",true)}
-})
-
-function aplicarFiltro(facturas) {
-  const estadoSeleccionado = document.getElementById("filtroEstado").value;
-  if (!estadoSeleccionado || estadoSeleccionado==="Todos") return facturas;
-  return facturas.filter(f => f.estado === estadoSeleccionado);
+async function finalizarCompra() {
+    const res = await fetch("/finalizar_compra", { method: "POST" });
+    const data = await res.json();
+    if (res.ok) {
+        showMessage("¡Pedido enviado!");
+        cargarCarrito();
+    } else {
+        showMessage(data.message, true);
+    }
 }
 
-function ordenarFacturas(facturas) {
-  const orden = { "Emitida": 1, "Pagada": 2, "Anulada": 3 };
-  return [...facturas].sort((a, b) => orden[a.estado] - orden[b.estado]);
-}
+document.getElementById("btnFinalizarCompra").onclick = finalizarCompra;
 
+document.getElementById("buscarFactura").oninput = async function() {
+    const val = this.value.trim();
+    if (!val) { facturasActuales = []; mostrarFacturasBuscadas(); return; }
+    const res = await fetch(`/buscar_facturas?cedula=${val}`);
+    if (res.ok) {
+        facturasActuales = (await res.json()).sort((a,b) => new Date(b.fecha_emision) - new Date(a.fecha_emision));
+        paginaActual = 1;
+        mostrarFacturasBuscadas();
+    }
+};
 
 function mostrarFacturasBuscadas() {
-    const contenedor = document.getElementById("facturasContainer")
-    contenedor.innerHTML = ""
-    let facturasFiltradas = aplicarFiltro(facturasActuales)
-    facturasFiltradas = ordenarFacturas(facturasFiltradas)
-    const inicio = (paginaActual - 1) * itemsPorPagina
-    const fin = inicio + itemsPorPagina
-    const facturasPage = facturasFiltradas.slice(inicio, fin)
-    if (facturasPage.length === 0) {
-        contenedor.innerHTML = '<p class="text-center fw-bold fs-5 mt-4">No se encontraron facturas</p>'
-        document.getElementById("paginacion").innerHTML = ''
-        return
+    const container = document.getElementById("facturasContainer");
+    container.innerHTML = "";
+    const filter = document.getElementById("filtroEstado").value;
+    let filtradas = facturasActuales;
+    if (filter && filter !== "Todos") filtradas = facturasActuales.filter(f => f.estado === filter);
+
+    const inicio = (paginaActual - 1) * itemsPorPagina;
+    const paginadas = filtradas.slice(inicio, inicio + itemsPorPagina);
+
+    if (paginadas.length === 0) {
+        container.innerHTML = '<p class="text-center p-4">No se encontraron registros.</p>';
+        return;
     }
-    facturasPage.forEach(f => {
-        const div = document.createElement("div")
-        div.className = `card mb-3 p-3 ${f.estado === "Anulada" ? "bg-light text-muted" : ""}`
-        let filas = ""
-        let totalSubtotal = 0
-        ;(f.productos || []).forEach(prod => {
-            const subtotal = Number(prod.subtotal || 0)
-            totalSubtotal += subtotal
-            filas += `<tr><td>${prod.nombre_producto}</td><td>x${prod.cantidad}</td><td>${subtotal.toLocaleString('es-CO',{style:'currency',currency:'COP'})}</td></tr>`
-        })
-        div.innerHTML = `
-            <div class="d-flex align-items-center mb-2">
-                <img src="${f.imagen_usuario || 'https://via.placeholder.com/60'}" class="rounded-circle me-3 perfil-click" width="60" height="60" style="cursor:pointer;">
-                <div>
-                    <strong>#${f.numero_factura}</strong><br>
-                    Cliente: ${f.nombre_cliente}<br>
-                    Cédula: ${f.cedula}<br>
-                    Estado: <span class="fw-bold estado-text">${f.estado}</span>
+
+    paginadas.forEach(f => {
+        const card = document.createElement("div");
+        card.className = "card fade-in-item";
+        let filas = "";
+        let total = 0;
+        (f.productos || []).forEach(p => {
+            total += Number(p.subtotal);
+            filas += `
+                <tr>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <img src="${p.imagen || 'https://via.placeholder.com/40'}" class="me-2 rounded shadow-sm" width="35" height="35" style="object-fit:cover;">
+                            <span>${p.nombre_producto}</span>
+                        </div>
+                    </td>
+                    <td>x${p.cantidad}</td>
+                    <td class="text-end">${Number(p.subtotal).toLocaleString('es-CO',{style:'currency',currency:'COP'})}</td>
+                </tr>`;
+        });
+
+        card.innerHTML = `
+            <div class="invoice-header d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center">
+                    <img src="${f.imagen_usuario || 'https://via.placeholder.com/50'}" class="rounded-circle me-3 shadow-sm border border-2 border-white" width="45" height="45" style="object-fit:cover;">
+                    <div>
+                        <h6 class="fw-bold mb-0">Factura #${f.numero_factura}</h6>
+                        <small class="text-muted">${new Date(f.fecha_emision).toLocaleString()}</small>
+                    </div>
                 </div>
+                <span class="badge ${f.estado==='Anulada'?'bg-secondary':'bg-dark'}">${f.estado}</span>
             </div>
-            <table class="table table-sm table-bordered text-center">
-                <thead class="table-dark"><tr><th>Producto</th><th>Cantidad</th><th>Subtotal</th></tr></thead>
+            <table class="table table-sm small table-borderless align-middle">
                 <tbody>${filas}</tbody>
             </table>
-            <p class="text-end fw-bold">Total: ${totalSubtotal.toLocaleString('es-CO',{style:'currency',currency:'COP'})}</p>
-            <p><strong>Método de Pago:</strong> ${f.metodo_pago || ''}</p>
-            <p><strong>Fecha Emisión:</strong> ${new Date(f.fecha_emision).toLocaleString('es-CO')}</p>
-            <div class="text-end">
-                <button class="btn btn-danger btn-cancelar" ${f.estado === "Anulada" ? "disabled" : ""}>Cancelar Pedido</button>
-            </div>
-        `
-        contenedor.appendChild(div)
-        div.querySelector(".perfil-click").addEventListener("click", () => mostrarModalUsuario(f))
-        const btnCancelar = div.querySelector(".btn-cancelar")
-        btnCancelar.addEventListener("click", async () => {
-            try {
-                const res = await fetch(`/facturas/${f.id_factura}/anular`, { method: "PUT" })
-                if (res.ok) {
-                    f.estado = "Anulada"
-                    showMessage("Factura anulada")
-                    div.classList.add("bg-light", "text-muted")
-                    div.querySelector(".estado-text").textContent = "Anulada"
-                    btnCancelar.disabled = true
-                    mostrarFacturasBuscadas()
-                } else showMessage("No se pudo anular la factura", true)
-            } catch (e) { showMessage("Error al anular factura", true) }
-        })
-    })
-    paginarFacturas()
+            <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top">
+                <button class="btn btn-sm btn-link text-danger p-0 btn-anular fw-bold" ${f.estado==='Anulada'?'disabled':''} style="text-decoration:none;">Anular pedido</button>
+                <div class="text-end">
+                    <small class="d-block text-muted">Total pagado</small>
+                    <span class="fw-bold fs-5">${total.toLocaleString('es-CO',{style:'currency',currency:'COP'})}</span>
+                </div>
+            </div>`;
+        
+        card.querySelector(".btn-anular").onclick = async () => {
+            if (await fetch(`/facturas/${f.id_factura}/anular`, { method: "PUT" })) {
+                showMessage("Pedido anulado");
+                f.estado = "Anulada";
+                mostrarFacturasBuscadas();
+            }
+        };
+        container.appendChild(card);
+    });
+    paginar(filtradas.length);
 }
 
-document.getElementById("filtroEstado").addEventListener("change", () => {
-    paginaActual = 1
-    mostrarFacturasBuscadas()
-})
-
-
-function paginarFacturas() {
-    const totalPaginas=Math.ceil(facturasActuales.length/itemsPorPagina)
-    const pagContainer=document.getElementById("paginacion")
-    pagContainer.innerHTML=""
-    for(let i=1;i<=totalPaginas;i++){
-        const li=document.createElement("li")
-        li.className=`page-item ${i===paginaActual?'active':''}`
-        li.innerHTML=`<a class="page-link" href="#">${i}</a>`
-        li.addEventListener("click",e=>{
-            e.preventDefault()
-            paginaActual=i
-            if(document.getElementById("buscarFactura").value.trim().length>0) mostrarFacturasBuscadas()
-            else mostrarFacturas()
-        })
-        pagContainer.appendChild(li)
+function paginar(total) {
+    const p = document.getElementById("paginacion");
+    p.innerHTML = "";
+    for (let i = 1; i <= Math.ceil(total / itemsPorPagina); i++) {
+        const li = document.createElement("li");
+        li.className = `page-item ${i === paginaActual ? 'active' : ''}`;
+        li.innerHTML = `<a class="page-link" href="#">${i}</a>`;
+        li.onclick = (e) => { e.preventDefault(); paginaActual = i; mostrarFacturasBuscadas(); };
+        p.appendChild(li);
     }
 }
 
-cargarCarrito()
+document.getElementById("filtroEstado").onchange = mostrarFacturasBuscadas;
+cargarCarrito();

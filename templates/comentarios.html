@@ -1,38 +1,40 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Comentarios | D'Antojitos ©</title>
-<link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='uploads/logo.ico') }}">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/style_comentarios.css') }}">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comentarios | D'Antojitos ©</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='uploads/logo.ico') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style_comentarios.css') }}">
 </head>
 <body>
     
 {% include 'navbar.html' %}
 
-<main>
-    <div class="chat-container p-3">
-        <div id="chatBox" class="mb-3"></div>
-        <div class="d-flex flex-column">
-            <textarea id="mensajeInput" class="form-control" rows="3" placeholder="Danos tu opinión..."></textarea>
-            <button id="sendBtn" class="btn btn-primary w-100 mt-2">Enviar Sugerencia</button>
+<main class="py-5">
+    <div class="chat-container">
+        <div class="chat-header p-3 border-bottom bg-white rounded-top-4">
+            <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-chat-dots me-2 text-primary"></i>Muro de Sugerencias</h5>
+        </div>
+        <div id="chatBox" class="p-4"></div>
+        <div class="chat-footer p-3 bg-white rounded-bottom-4 border-top">
+            <div class="d-flex flex-column">
+                <textarea id="mensajeInput" class="form-control shadow-none mb-2" rows="2" placeholder="Escribe tu opinión aquí..."></textarea>
+                <button id="sendBtn" class="btn btn-primary fw-bold py-2">
+                    <i class="bi bi-send me-2"></i>Enviar Sugerencia
+                </button>
+            </div>
         </div>
     </div>
 </main>
 
-<div class="dropdown-actions" id="accionesDropdownContainer">
-    <ul class="dropdown-menu show" id="accionesDropdown"></ul>
-</div>
-
-<div id="toastContainer" class="position-fixed top-0 start-0 p-3"></div>
+<div id="toastContainer" class="toast-container position-fixed top-0 start-0 p-3"></div>
 
 {% include 'footer.html' %}
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-
 <script>
     window.userId = "{{ user_id }}";
     window.userLogged = "{{ 'true' if session.get('user') else 'false' }}" === "true";

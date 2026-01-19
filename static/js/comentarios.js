@@ -2,197 +2,126 @@ const chatBox = document.getElementById("chatBox");
 const sendBtn = document.getElementById("sendBtn");
 const mensajeInput = document.getElementById("mensajeInput");
 const toastContainer = document.getElementById('toastContainer');
-let comentarioAbierto = null;
 let editandoComentario = null;
 const usuario = {id_usuario: window.userId};
 
-function showMessage(msg, isError=false){
-    const toastEl = document.createElement('div');
-    toastEl.className = 'toast align-items-center text-bg-light border-0';
-    toastEl.setAttribute('role','alert');
-    toastEl.setAttribute('aria-live','assertive');
-    toastEl.setAttribute('aria-atomic','true');
-    toastEl.innerHTML = `<div class="d-flex"><div class="toast-body">${isError?'❌':'✅'} ${msg}</div>
-        <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast"></button></div>`;
-    toastContainer.appendChild(toastEl);
-    new bootstrap.Toast(toastEl,{delay:800}).show();
+function showMessage(msg, isError = false) {
+    const toast = document.createElement('div');
+    toast.className = 'custom-toast';
+    toast.innerHTML = `
+        <div class="d-flex align-items-center">
+            <i class="bi ${isError ? 'bi-x-circle text-danger' : 'bi-check-circle text-success'} me-3 fs-5"></i>
+            <span>${msg}</span>
+        </div>
+        <i class="bi bi-x-lg ms-3 btn-close-toast" style="cursor:pointer; font-size: 0.7rem; opacity: 0.7;"></i>
+    `;
+    toastContainer.appendChild(toast);
+    const remove = () => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 400);
+    };
+    toast.querySelector('.btn-close-toast').onclick = remove;
+    setTimeout(remove, 3500);
 }
 
-function bloquearAcciones(){
-    document.querySelectorAll("button, input, textarea").forEach(el => el.disabled = true);
-}
-
-function renderComentario(c){
+function renderComentario(c) {
     const div = document.createElement("div");
-    div.classList.add("message", "position-relative");
-    div.dataset.id = c.id;
-    div.dataset.usuario = c.id_usuario;
-    const fotoPerfil = c.usuario_info?.foto_perfil;
-    const nombreUsuario = c.usuario_info?.nombre_usuario || 'Usuario';
-    const telefono = c.usuario_info?.telefono || 'N/A';
-    const correo = c.usuario_info?.correo || 'N/A';
-    let imgHtml = '';
-    if(fotoPerfil){
-        imgHtml = `<img src="${fotoPerfil}" alt="perfil" class="rounded-circle me-2 foto-click" 
-            style="width:40px;height:40px;object-fit:cover;cursor:pointer;">`;
-    }
+    div.className = "message";
+    div.id = `msg-${c.id}`;
+    const foto = c.usuario_info?.foto_perfil || 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
+    const nombre = c.usuario_info?.nombre_usuario || 'Usuario';
+    const fecha = new Date(c.created_at).toLocaleString('es-CO', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+
     div.innerHTML = `
-        <div class="d-flex align-items-start">
-            ${imgHtml}
-            <div class="message-content flex-grow-1">
-                <div class="message-header d-flex justify-content-between">
-                    <span class="username fw-bold">${nombreUsuario}</span>
-                    <span class="time text-muted small" style="margin-left:4px;">
-                        ${new Date(c.created_at).toLocaleString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}
-                    </span>
+        <div class="d-flex align-items-start position-relative">
+            <img src="${foto}" class="rounded-circle me-3 foto-click" width="45" height="45" style="object-fit:cover; cursor:pointer;">
+            <div class="flex-grow-1">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="fw-bold text-primary" style="font-size:0.9rem;">${nombre}</span>
+                    <span class="text-muted" style="font-size:0.75rem;">${fecha}</span>
                 </div>
                 <div class="mensaje-texto">${c.mensaje}</div>
             </div>
+            ${c.id_usuario === usuario.id_usuario ? `<i class="bi bi-three-dots-vertical ms-2 btn-options" style="cursor:pointer;"></i>` : ''}
         </div>
     `;
-    if(c.id_usuario === usuario.id_usuario){
-        const dots = document.createElement("i");
-        dots.className = "bi bi-three-dots-vertical fw-bold";
-        dots.style.cursor = "pointer";
-        dots.style.position = "absolute";
-        dots.style.top = "10px";
-        dots.style.right = "10px";
-        dots.style.fontSize = "1.5rem";
-        dots.style.transition = "transform 0.2s ease";
-        dots.addEventListener("mouseenter",()=>dots.style.transform="scale(1.2)");
-        dots.addEventListener("mouseleave",()=>dots.style.transform="scale(1)");
-        div.appendChild(dots);
 
-        dots.addEventListener("click",(e)=>{
+    if(c.id_usuario === usuario.id_usuario) {
+        div.querySelector(".btn-options").onclick = (e) => {
             e.stopPropagation();
-            document.querySelectorAll("body > .comentario-dropdown").forEach(dd=>dd.remove());
-            const dropdown = document.createElement("ul");
-            dropdown.className = "list-group position-absolute bg-white shadow rounded comentario-dropdown";
-            dropdown.style.position = "absolute";
-            dropdown.style.zIndex = "99999";
-            dropdown.innerHTML = `
-                <li class="list-group-item p-2" style="cursor:pointer;" onclick="iniciarEdicion('${c.id}','${c.mensaje.replace(/'/g,"\\'")}');this.closest('ul').remove();">✏️ Editar</li>
-                <li class="list-group-item p-2 text-danger" style="cursor:pointer;" onclick="eliminarComentario('${c.id}');this.closest('ul').remove();">🗑️ Eliminar</li>
+            document.querySelectorAll(".comentario-dropdown").forEach(d => d.remove());
+            const dd = document.createElement("ul");
+            dd.className = "list-group position-absolute shadow comentario-dropdown";
+            dd.innerHTML = `
+                <li class="list-group-item py-2" style="cursor:pointer;"><i class="bi bi-pencil me-2"></i>Editar</li>
+                <li class="list-group-item py-2 text-danger" style="cursor:pointer;"><i class="bi bi-trash me-2"></i>Eliminar</li>
             `;
-            document.body.appendChild(dropdown);
-            const rect = dots.getBoundingClientRect();
-            dropdown.style.top = `${rect.bottom + window.scrollY}px`;
-            dropdown.style.left = `${rect.left + window.scrollX - dropdown.offsetWidth + 25}px`;
-            const closeDropdown = (ev)=>{
-                if(!dropdown.contains(ev.target) && ev.target!==dots){
-                    dropdown.remove();
-                    document.removeEventListener("click", closeDropdown);
-                }
-            };
-            document.addEventListener("click", closeDropdown);
-        });
-    }
-    const imgEl = div.querySelector(".foto-click");
-    if(imgEl){
-        imgEl.addEventListener("click", ()=>{
-            const modalHtml = `
-                <div class="modal fade" id="perfilModal" tabindex="-1">
-                  <div class="modal-dialog modal-dialog-centered">
-                    <div class="modal-content p-3">
-                      <img src="${fotoPerfil}" alt="perfil-grande" class="img-fluid rounded mb-3">
-                      <div class="card p-3">
-                        <h5 class="mb-2">${nombreUsuario}</h5>
-                        <p class="mb-1"><strong>Teléfono:</strong> ${telefono}</p>
-                        <p class="mb-0"><strong>Correo:</strong> ${correo}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>`;
-            document.body.insertAdjacentHTML("beforeend", modalHtml);
-            const modal = new bootstrap.Modal(document.getElementById("perfilModal"));
-            modal.show();
-            document.getElementById("perfilModal").addEventListener("hidden.bs.modal", function(){
-                this.remove();
-            });
-        });
+            const r = e.target.getBoundingClientRect();
+            dd.style.top = `${r.bottom + window.scrollY}px`;
+            dd.style.left = `${r.left + window.scrollX - 100}px`;
+            dd.style.position = "absolute";
+            dd.querySelectorAll("li")[0].onclick = () => iniciarEdicion(c.id, c.mensaje);
+            dd.querySelectorAll("li")[1].onclick = () => eliminarComentario(c.id);
+            document.body.appendChild(dd);
+            document.addEventListener("click", () => dd.remove(), {once:true});
+        };
     }
     return div;
 }
 
-async function cargarComentarios(){
-    try{
-        const cached = localStorage.getItem('chatCache');
-        if(cached){
-            const data = JSON.parse(cached);
-            chatBox.innerHTML = "";
-            data.forEach(c => chatBox.appendChild(renderComentario(c)));
-        }
-
+async function cargarComentarios() {
+    try {
         const res = await fetch("/comentarios");
-        if(res.status===401 || res.status===403){
-            showMessage("Inicie Sesión para ver comentarios", true);
-            bloquearAcciones();
-            return;
-        }
+        if(!res.ok) return;
         const data = await res.json();
-        localStorage.setItem('chatCache', JSON.stringify(data));
         chatBox.innerHTML = "";
         data.forEach(c => chatBox.appendChild(renderComentario(c)));
-        const scrollPos = localStorage.getItem('chatScroll');
-        chatBox.scrollTop = scrollPos ? parseInt(scrollPos) : chatBox.scrollHeight;
-    }catch(error){
-        showMessage("Error al cargar comentarios",true);
-    }
+        chatBox.scrollTop = chatBox.scrollHeight;
+    } catch(e) { console.error(e); }
 }
 
-function iniciarEdicion(id,mensaje){
-    mensajeInput.value = mensaje;
+function iniciarEdicion(id, msg) {
+    mensajeInput.value = msg;
     editandoComentario = id;
-    sendBtn.textContent = "Guardar Cambios";
+    sendBtn.innerHTML = `<i class="bi bi-check2-all me-2"></i>Guardar Cambios`;
     mensajeInput.focus();
 }
 
-sendBtn.addEventListener("click", async()=>{
+sendBtn.onclick = async () => {
     const mensaje = mensajeInput.value.trim();
     if(!mensaje) return;
-    try{
-        if(editandoComentario){
-            const res = await fetch(`/comentarios/${editandoComentario}`,{
-                method:"PUT",
-                headers:{"Content-Type":"application/json"},
-                body:JSON.stringify({mensaje})
-            });
-            if(res.ok) showMessage("Comentario Editado");
-            editandoComentario = null;
-            sendBtn.textContent = "Enviar Sugerencia";
-        } else {
-            const res = await fetch("/comentarios",{
-                method:"POST",
-                headers:{"Content-Type":"application/json"},
-                body:JSON.stringify({mensaje})
-            });
-            if(res.ok) showMessage("Comentario Publicado");
+    try {
+        let res, url = "/comentarios", method = "POST";
+        if(editandoComentario) {
+            url = `/comentarios/${editandoComentario}`;
+            method = "PUT";
         }
-        mensajeInput.value = "";
-        cargarComentarios();
-    }catch(error){
-        showMessage("Error enviando comentario",true);
-    }
-});
-
-async function eliminarComentario(id){
-    try{
-        const res = await fetch(`/comentarios/${id}`,{method:"DELETE"});
-        if(res.ok){
-            showMessage("Comentario eliminado");
+        res = await fetch(url, {
+            method: method,
+            headers: {"Content-Type":"application/json"},
+            body: JSON.stringify({mensaje})
+        });
+        if(res.ok) {
+            showMessage(editandoComentario ? "Cambios guardados" : "Mensaje enviado");
+            mensajeInput.value = "";
+            editandoComentario = null;
+            sendBtn.innerHTML = `<i class="bi bi-send me-2"></i>Enviar Sugerencia`;
             cargarComentarios();
         }
-    }catch(error){
-        showMessage("Error eliminando comentario",true);
-    }
-}
+    } catch(e) { showMessage("Error de red", true); }
+};
 
-window.addEventListener('beforeunload', ()=>{
-    localStorage.setItem('chatScroll', chatBox.scrollTop);
-});
+async function eliminarComentario(id) {
+    if(!confirm("¿Eliminar comentario?")) return;
+    try {
+        const res = await fetch(`/comentarios/${id}`, {method:"DELETE"});
+        if(res.ok) {
+            const el = document.getElementById(`msg-${id}`);
+            el.style.opacity = '0';
+            el.style.transform = 'scale(0.9)';
+            setTimeout(() => { el.remove(); showMessage("Eliminado"); }, 300);
+        }
+    } catch(e) { showMessage("Error al eliminar", true); }
+}
 
 cargarComentarios();
-
-if('serviceWorker' in navigator){
-    window.addEventListener('load',()=>navigator.serviceWorker.register('/static/js/service-worker-comentarios.js').then(()=>console.log('SW registrado')).catch(console.error));
-}
