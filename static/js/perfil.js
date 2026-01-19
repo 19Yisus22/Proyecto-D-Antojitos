@@ -16,7 +16,7 @@ function showMessage(msg, isError = false) {
             <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
         </div>`;
     toastContainer.appendChild(toastEl);
-    setTimeout(() => toastEl.remove(), 3500);
+    setTimeout(() => toastEl.remove(), 4000);
 }
 
 const passInput = document.getElementById("nuevaContrasena");
@@ -33,8 +33,8 @@ function validarPass() {
     }
 }
 
-passInput.addEventListener("input", validarPass);
-confirmInput.addEventListener("input", validarPass);
+if(passInput) passInput.addEventListener("input", validarPass);
+if(confirmInput) confirmInput.addEventListener("input", validarPass);
 
 const inputFile = document.getElementById("imagen_url");
 if (inputFile) {
@@ -53,7 +53,7 @@ if (btnEditarPerfil) {
         inputs.forEach(i => i.disabled = false);
         btnActualizarPerfil.style.display = "inline-block";
         btnEditarPerfil.style.display = "none";
-        showMessage("Modo de edición activado");
+        showMessage("Edición habilitada");
     });
 }
 
@@ -63,7 +63,7 @@ document.getElementById("formPerfil").addEventListener("submit", async e => {
     const res = await fetch(`/actualizar_perfil/${USER_ID}`, { method: "PUT", body: formData });
     const data = await res.json();
     if (res.ok && data.ok) {
-        showMessage("¡Perfil actualizado con éxito!");
+        showMessage("Perfil actualizado correctamente");
         inputs.forEach(i => i.disabled = true);
         btnActualizarPerfil.style.display = "none";
         btnEditarPerfil.style.display = "inline-block";
@@ -72,73 +72,107 @@ document.getElementById("formPerfil").addEventListener("submit", async e => {
 
 document.getElementById("btnCambiarContrasena").addEventListener("click", async () => {
     const n = passInput.value.trim();
-    if (!n || n !== confirmInput.value.trim()) { showMessage("Las contraseñas no coinciden", true); return; }
+    if (!n || n !== confirmInput.value.trim()) { showMessage("Contraseñas no coinciden", true); return; }
     const res = await fetch("/cambiar_contrasena", { 
-        method: "PUT", 
-        headers: { "Content-Type": "application/json" }, 
-        body: JSON.stringify({ nueva: n }) 
+        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nueva: n }) 
     });
     if (res.ok) {
-        showMessage("Contraseña actualizada exitosamente");
+        showMessage("Contraseña cambiada con éxito");
         passInput.value = ""; confirmInput.value = "";
-        confirmInput.className = "form-control custom-input";
     }
 });
 
 if (USER_ROLE === 'admin') {
-    const modalElement = document.getElementById('imgModal');
-    const myModal = new bootstrap.Modal(modalElement);
+    const myModal = new bootstrap.Modal(document.getElementById('imgModal'));
     const searchInput = document.getElementById('userSearch');
 
     async function fetchUsuarios() {
         const res = await fetch("/listar_usuarios");
         if (res.ok) {
-            allUsers = await res.json();
+            let data = await res.json();
+            allUsers = data.sort((a, b) => {
+                const rolA = (a.roles?.nombre_role || a.rol) === 'admin' ? 0 : 1;
+                const rolB = (b.roles?.nombre_role || b.rol) === 'admin' ? 0 : 1;
+                return rolA - rolB;
+            });
             filteredUsers = [...allUsers];
             renderUserTable();
         }
     }
 
+    async function cambiarRol(id, nuevo) {
+        if (String(id) === String(USER_ID)) return showMessage("No puedes cambiar tu propio rol", true);
+        
+        if (nuevo === 'admin') {
+            const admins = allUsers.filter(u => (u.roles?.nombre_role || u.rol) === 'admin');
+            if (admins.length >= 3) {
+                return showMessage("Límite de 3 administradores alcanzado. No se pueden asignar más.", true);
+            }
+        }
+
+        const res = await fetch("/actualizar_rol_usuario", {
+            method: "PUT", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: id, rol: nuevo })
+        });
+        if (res.ok) { showMessage("Rol actualizado"); fetchUsuarios(); }
+    }
+
     function renderUserTable() {
         const list = document.getElementById("usuariosList");
         list.innerHTML = "";
-        
         const start = (currentPage - 1) * recordsPerPage;
-        const end = start + recordsPerPage;
-        const pageItems = filteredUsers.slice(start, end);
-
+        const pageItems = filteredUsers.slice(start, start + recordsPerPage);
         document.getElementById("countUsers").textContent = allUsers.length;
         document.getElementById("countVisible").textContent = filteredUsers.length;
 
         pageItems.forEach(u => {
             const div = document.createElement("div");
-            div.className = "list-group-item d-flex align-items-center justify-content-between py-3 user-item fade-in";
+            div.className = "list-group-item d-flex align-items-center justify-content-between py-3 fade-in";
+            const rol = u.roles?.nombre_role || u.rol;
+            const nuevo = rol === 'admin' ? 'cliente' : 'admin';
+            const esYo = String(u.id_cliente) === String(USER_ID);
+
             div.innerHTML = `
                 <div class="d-flex align-items-center">
-                    <img src="${u.imagen_url || '/static/uploads/default_icon_profile.png'}" 
-                         class="rounded-circle me-3 shadow-sm border" width="45" height="45" style="object-fit:cover;cursor:pointer;">
+                    <img src="${u.imagen_url || '/static/default_icon_profile.png'}" class="rounded-circle me-3 border shadow-sm" width="45" height="45" style="object-fit:cover;">
                     <div>
-                        <h6 class="mb-0 fw-bold">${u.nombre} ${u.apellido}</h6>
+                        <h6 class="mb-0 fw-bold">${u.nombre} ${u.apellido} ${esYo ? '<span class="badge bg-secondary ms-1">Tú</span>' : ''}</h6>
                         <small class="text-muted">${u.correo}</small>
                     </div>
                 </div>
-                <div class="d-flex align-items-center gap-3">
-                    <span class="badge ${u.roles.nombre_role === 'admin' ? 'bg-danger' : 'bg-primary'} rounded-pill px-3">${u.roles.nombre_role}</span>
-                    <button class="btn btn-sm btn-light border btn-view-user" data-id="${u.id_cliente}"><i class="bi bi-eye"></i></button>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge ${rol === 'admin' ? 'bg-danger' : 'bg-primary'} rounded-pill px-3">${rol}</span>
+                    <button class="btn btn-sm btn-outline-dark" ${esYo ? 'disabled' : ''} id="btnRol-${u.id_cliente}"><i class="bi bi-person-gear"></i></button>
+                    <button class="btn btn-sm btn-light border" id="btnVer-${u.id_cliente}"><i class="bi bi-eye"></i></button>
                 </div>`;
             
-            div.querySelector('.btn-view-user').onclick = () => showUserModal(u);
             list.appendChild(div);
+            
+            document.getElementById(`btnVer-${u.id_cliente}`).onclick = () => {
+                document.getElementById("modalImg").src = u.imagen_url || '/static/default_icon_profile.png';
+                document.getElementById("modalNombre").textContent = `${u.nombre} ${u.apellido}`;
+                document.getElementById("modalId").textContent = u.id_cliente;
+                document.getElementById("modalCedula").textContent = u.cedula || 'N/A';
+                document.getElementById("modalTelefono").textContent = u.telefono || 'N/A';
+                document.getElementById("modalCorreo").textContent = u.correo;
+                document.getElementById("modalDireccion").textContent = u.direccion || 'N/A';
+                document.getElementById("modalFecha").textContent = new Date(u.fecha_creacion).toLocaleDateString();
+                document.getElementById("modalRol").textContent = rol.toUpperCase();
+                myModal.show();
+            };
+            
+            if(!esYo) {
+                document.getElementById(`btnRol-${u.id_cliente}`).onclick = () => cambiarRol(u.id_cliente, nuevo);
+            }
         });
         renderPagination();
     }
 
     function renderPagination() {
-        const totalPages = Math.ceil(filteredUsers.length / recordsPerPage);
+        const total = Math.ceil(filteredUsers.length / recordsPerPage);
         const nav = document.getElementById("paginationControls");
         nav.innerHTML = "";
-
-        for (let i = 1; i <= totalPages; i++) {
+        for (let i = 1; i <= total; i++) {
             const li = document.createElement("li");
             li.className = `page-item ${i === currentPage ? 'active' : ''}`;
             li.innerHTML = `<a class="page-link" href="#">${i}</a>`;
@@ -147,48 +181,39 @@ if (USER_ROLE === 'admin') {
         }
     }
 
-    function showUserModal(u) {
-        document.getElementById("modalImg").src = u.imagen_url || '/static/uploads/default_icon_profile.png';
-        document.getElementById("modalNombre").textContent = `${u.nombre} ${u.apellido}`;
-        document.getElementById("modalId").textContent = u.id_cliente;
-        document.getElementById("modalCedula").textContent = u.cedula || 'N/A';
-        document.getElementById("modalTelefono").textContent = u.telefono || 'N/A';
-        document.getElementById("modalCorreo").textContent = u.correo;
-        document.getElementById("modalDireccion").textContent = u.direccion || 'N/A';
-        document.getElementById("modalFecha").textContent = new Date(u.fecha_creacion).toLocaleDateString();
-        document.getElementById("modalRol").textContent = u.roles.nombre_role.toUpperCase();
-        
-        modalElement.removeAttribute('aria-hidden');
-        myModal.show();
-    }
-
     searchInput.addEventListener('input', (e) => {
-        const term = e.target.value.toLowerCase();
-        const safeTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp(safeTerm, 'i');
-
-        filteredUsers = allUsers.filter(u => 
-            regex.test(u.nombre) || 
-            regex.test(u.apellido) || 
-            regex.test(u.correo)
-        );
-        currentPage = 1;
-        renderUserTable();
+        const t = e.target.value.toLowerCase();
+        filteredUsers = allUsers.filter(u => u.nombre.toLowerCase().includes(t) || u.correo.toLowerCase().includes(t));
+        currentPage = 1; renderUserTable();
     });
 
-    document.getElementById("btnEliminarUsuario").onclick = async () => {
-        const correo = document.getElementById("correoEliminar").value.trim();
-        if (!correo) return showMessage("Ingrese un correo válido", true);
-        
-        if (confirm(`¿Eliminar permanentemente a ${correo}?`)) {
-            const res = await fetch(`/eliminar_usuario/${correo}`, { method: "DELETE" });
-            if (res.ok) {
-                showMessage("Usuario eliminado");
-                document.getElementById("correoEliminar").value = "";
-                fetchUsuarios();
-            } else showMessage("No se pudo eliminar el usuario", true);
-        }
+    document.getElementById("btnExportarExcel").onclick = () => {
+        if (allUsers.length === 0) return showMessage("No hay datos", true);
+        const wsData = allUsers.map(u => ({
+            "FECHA REGISTRO": new Date(u.fecha_creacion).toLocaleDateString(),
+            "ROL": (u.roles?.nombre_role || u.rol).toUpperCase(),
+            "NOMBRE": u.nombre,
+            "APELLIDO": u.apellido,
+            "CÉDULA": u.cedula || 'N/A',
+            "CORREO": u.correo,
+            "TELÉFONO": u.telefono || 'N/A',
+            "DIRECCIÓN": u.direccion || 'N/A',
+            "MÉTODO PAGO": u.metodo_pago || 'N/A'
+        }));
+        const ws = XLSX.utils.json_to_sheet(wsData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Usuarios");
+        XLSX.writeFile(wb, `Reporte_D_Antojitos_${new Date().getTime()}.xlsx`);
     };
 
+    document.getElementById("btnEliminarUsuario").onclick = async () => {
+        const c = document.getElementById("correoEliminar").value.trim().toLowerCase();
+        if (!c) return showMessage("Ingresa un correo", true);
+        const res = await fetch("/eliminar_usuario_por_correo", { 
+            method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ correo: c })
+        });
+        if (res.ok) { showMessage("Usuario eliminado"); fetchUsuarios(); document.getElementById("correoEliminar").value = ""; }
+        else showMessage("No se pudo eliminar", true);
+    };
     fetchUsuarios();
 }

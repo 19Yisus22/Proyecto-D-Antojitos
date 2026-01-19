@@ -125,3 +125,7 @@ async function eliminarComentario(id) {
 }
 
 cargarComentarios();
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('/static/js/service-worker-comentarios.js').then(() => console.log('SW registrado')).catch(console.error));
+}

@@ -20,7 +20,7 @@
         <form id="formPerfil" enctype="multipart/form-data">
             <div class="d-flex flex-column align-items-center mb-4 position-relative">
                 <div class="profile-img-container">
-                    <img id="previewImagen" src="{{ user.imagen_url or '/static/uploads/default_icon_profile.png' }}" class="img-preview rounded-circle shadow-sm">
+                    <img id="previewImagen" src="{{ user.imagen_url or '/static/default_icon_profile.png' }}" class="img-preview rounded-circle shadow-sm">
                     <label for="imagen_url" class="camera-btn">
                         <i class="bi bi-camera-fill"></i>
                         <input type="file" id="imagen_url" name="imagen_url" accept="image/*" style="display:none" disabled>
@@ -62,7 +62,7 @@
                 </div>
                 <div class="col-md-6">
                     <label class="form-label fw-bold">Rol</label>
-                    <input type="text" class="form-control custom-input" value="{{ user.roles.nombre_role | capitalize }}" disabled>
+                    <input type="text" class="form-control custom-input" value="{{ (user.roles.nombre_role if user.roles else 'cliente') | capitalize }}" disabled>
                 </div>
             </div>
 
@@ -94,21 +94,26 @@
 
     {% if user.roles.nombre_role=='admin' %}
     <div class="admin-section mt-5 fade-in">
-        <h4 class="mb-4 text-primary d-flex align-items-center">
-            <i class="bi bi-people-fill me-2"></i> Gestión de Usuarios
-        </h4>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4 class="mb-0 text-primary d-flex align-items-center">
+                <i class="bi bi-people-fill me-2"></i> Gestión de Usuarios
+            </h4>
+            <button id="btnExportarExcel" class="btn btn-success shadow-sm">
+                <i class="bi bi-file-earmark-excel me-2"></i>Exportar Reporte
+            </button>
+        </div>
 
         <div class="card p-3 mb-4 shadow-sm border-0 bg-white">
             <div class="row g-3 align-items-center">
                 <div class="col-md-8">
                     <div class="input-group">
                         <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
-                        <input type="text" id="userSearch" class="form-control border-start-0" placeholder="Buscar por nombre o correo (permite caracteres especiales)...">
+                        <input type="text" id="userSearch" class="form-control border-start-0" placeholder="Buscar por nombre o correo...">
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="input-group">
-                        <input type="email" id="correoEliminar" class="form-control" placeholder="Eliminar por correo">
+                        <input type="email" id="correoEliminar" class="form-control" placeholder="Correo a eliminar">
                         <button id="btnEliminarUsuario" class="btn btn-outline-danger">Eliminar</button>
                     </div>
                 </div>
@@ -136,7 +141,7 @@
             <div class="modal-header border-0">
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body p-4 text-center" id="modalContent">
+            <div class="modal-body p-4 text-center">
                 <img id="modalImg" class="rounded-circle mb-3 border shadow-sm" style="width:110px;height:110px;object-fit:cover;">
                 <h4 id="modalNombre" class="fw-bold mb-0"></h4>
                 <p id="modalRol" class="text-primary small fw-bold mb-3"></p>
@@ -156,9 +161,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
 <script>
     const USER_ID = "{{ user.id_cliente }}";
-    const USER_ROLE = "{{ user.roles.nombre_role }}";
+    const USER_ROLE = "{{ user.roles.nombre_role if user.roles else 'cliente' }}";
 </script>
 <script src="{{ url_for('static', filename='js/perfil.js') }}"></script>
 </body>

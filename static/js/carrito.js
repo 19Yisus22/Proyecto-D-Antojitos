@@ -22,27 +22,79 @@ function showMessage(msg, isError = false) {
     setTimeout(remove, 3500);
 }
 
-function mostrarModalUsuario(u) {
-    const modalEl = document.createElement("div");
-    modalEl.className = "modal fade";
-    modalEl.innerHTML = `
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content border-0 rounded-4">
-                <div class="modal-body text-center p-4">
-                    <img src="${u.imagen_usuario || 'https://via.placeholder.com/100'}" class="rounded-circle mb-3 shadow-sm" width="100" height="100" style="object-fit:cover;">
-                    <h5 class="fw-bold mb-1">${u.nombre_cliente}</h5>
-                    <p class="text-muted small mb-3">${u.correo}</p>
-                    <div class="text-start bg-light p-3 rounded-3">
-                        <p class="mb-1 small"><strong>Cédula:</strong> ${u.cedula}</p>
-                        <p class="mb-0 small"><strong>Teléfono:</strong> ${u.telefono}</p>
-                    </div>
-                </div>
-            </div>
-        </div>`;
-    document.body.appendChild(modalEl);
-    const m = new bootstrap.Modal(modalEl);
-    m.show();
-    modalEl.addEventListener("hidden.bs.modal", () => modalEl.remove());
+async function descargarPDF(f) {
+    const { jsPDF } = window.jspdf || window.jsPDF;
+    if (!jsPDF) return;
+    
+    const doc = new jsPDF();
+    const logoUrl = '/static/uploads/logo.png';
+
+    try {
+        const img = new Image();
+        img.src = logoUrl;
+        await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+        });
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        doc.addImage(canvas.toDataURL('image/png'), 'PNG', 15, 12, 22, 22);
+    } catch (e) { console.warn("Logo no cargado"); }
+
+    doc.setFontSize(22);
+    doc.setTextColor(33, 37, 41);
+    doc.text("D'Antojitos ©", 42, 25);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Factura N°: ${f.numero_factura}`, 145, 20);
+    doc.text(`Fecha: ${new Date(f.fecha_emision).toLocaleString()}`, 145, 25);
+    
+    // Estado de la factura resaltado
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(f.estado === 'Anulada' ? 220 : 40, f.estado === 'Anulada' ? 53 : 167, f.estado === 'Anulada' ? 69 : 69);
+    doc.text(`ESTADO: ${f.estado.toUpperCase()}`, 145, 30);
+    doc.setFont("helvetica", "normal");
+
+    const tableData = (f.productos || []).map(p => [
+        p.nombre_producto,
+        `x${p.cantidad}`,
+        Number(p.subtotal).toLocaleString('es-CO', { style: 'currency', currency: 'COP' })
+    ]);
+
+    doc.autoTable({
+        startY: 45,
+        head: [['Producto', 'Cantidad', 'Subtotal']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: { fillColor: [33, 37, 41] }
+    });
+
+    const finalY = doc.lastAutoTable.finalY;
+    const total = (f.productos || []).reduce((acc, curr) => acc + Number(curr.subtotal), 0);
+    
+    doc.setFontSize(14);
+    doc.setTextColor(0);
+    doc.text(`TOTAL: ${total.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}`, 195, finalY + 12, { align: 'right' });
+
+    // Mensaje final centrado y estilizado
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "italic");
+    doc.setTextColor(100);
+    const mensaje1 = "Espere a que se procese el pedido en el sistema.";
+    const mensaje2 = "¡Gracias por la compra!";
+    
+    const textWidth1 = doc.getStringUnitWidth(mensaje1) * doc.internal.getFontSize() / doc.internal.scaleFactor;
+    const textWidth2 = doc.getStringUnitWidth(mensaje2) * doc.internal.getFontSize() / doc.internal.scaleFactor;
+    
+    doc.text(mensaje1, (210 - textWidth1) / 2, finalY + 30);
+    doc.setFont("helvetica", "bolditalic");
+    doc.text(mensaje2, (210 - textWidth2) / 2, finalY + 38);
+
+    doc.save(`Factura_${f.numero_factura}.pdf`);
 }
 
 async function cargarCarrito() {
@@ -52,10 +104,7 @@ async function cargarCarrito() {
     btn.style.display = "none";
     try {
         const res = await fetch("/obtener_carrito");
-        if (!res.ok) {
-            container.innerHTML = '<p class="p-5 text-center fw-bold">No se pudo cargar el carrito.</p>';
-            return;
-        }
+        if (!res.ok) return;
         const data = await res.json();
         if (!data.productos || data.productos.length === 0) {
             container.innerHTML = '<div class="p-5 text-center text-muted"><i class="bi bi-cart-x fs-1"></i><p class="mt-2">El carrito está vacío</p></div>';
@@ -64,7 +113,7 @@ async function cargarCarrito() {
 
         let totalGeneral = 0;
         const tabla = document.createElement("table");
-        tabla.className = "table align-middle mb-0 fade-in-item";
+        tabla.className = "table align-middle mb-0";
         tabla.innerHTML = `
             <thead><tr><th class="ps-4">Producto</th><th>Cantidad</th><th>Unitario</th><th>Subtotal</th><th class="text-center">Acción</th></tr></thead>
             <tbody></tbody>
@@ -82,10 +131,16 @@ async function cargarCarrito() {
             const sub = Number(item.precio_unitario) * Number(item.cantidad);
             totalGeneral += sub;
             const tr = document.createElement("tr");
+            
+            const imgPath = item.imagen || item.imagen_url;
+            const fotoHtml = imgPath 
+                ? `<img src="${imgPath}" class="img-preview me-3" width="45" height="45" style="object-fit:cover; border-radius: 8px;" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'me-3 bg-light d-flex align-items-center justify-content-center\' style=\'width:45px; height:45px; border-radius:8px;\'><i class=\'bi bi-box\'></i></div>';">`
+                : `<div class="me-3 bg-light d-flex align-items-center justify-content-center" style="width:45px; height:45px; border-radius:8px;"><i class="bi bi-box"></i></div>`;
+
             tr.innerHTML = `
                 <td class="ps-4 py-3">
                     <div class="d-flex align-items-center">
-                        <img src="${item.imagen || 'https://via.placeholder.com/50'}" class="img-preview me-3" width="45" height="45" style="object-fit:cover; border-radius: 8px;">
+                        ${fotoHtml}
                         <strong>${item.nombre_producto}</strong>
                     </div>
                 </td>
@@ -103,7 +158,7 @@ async function cargarCarrito() {
 
         document.getElementById("totalCarritoFinal").textContent = totalGeneral.toLocaleString('es-CO',{style:'currency',currency:'COP'});
         btn.style.display = "inline-block";
-    } catch(e) { container.innerHTML = '<p class="p-5 text-center">Error de servidor.</p>'; }
+    } catch(e) { console.error(e); }
 }
 
 async function finalizarCompra() {
@@ -135,7 +190,7 @@ function mostrarFacturasBuscadas() {
     container.innerHTML = "";
     const filter = document.getElementById("filtroEstado").value;
     let filtradas = facturasActuales;
-    if (filter && filter !== "Todos") filtradas = facturasActuales.filter(f => f.estado === filter);
+    if (filter && filter !== "") filtradas = facturasActuales.filter(f => f.estado === filter);
 
     const inicio = (paginaActual - 1) * itemsPorPagina;
     const paginadas = filtradas.slice(inicio, inicio + itemsPorPagina);
@@ -147,51 +202,66 @@ function mostrarFacturasBuscadas() {
 
     paginadas.forEach(f => {
         const card = document.createElement("div");
-        card.className = "card fade-in-item";
+        card.className = "card mb-4 border-0 shadow-sm rounded-4 overflow-hidden";
         let filas = "";
         let total = 0;
         (f.productos || []).forEach(p => {
             total += Number(p.subtotal);
             filas += `
                 <tr>
-                    <td>
-                        <div class="d-flex align-items-center">
-                            <img src="${p.imagen || 'https://via.placeholder.com/40'}" class="me-2 rounded shadow-sm" width="35" height="35" style="object-fit:cover;">
-                            <span>${p.nombre_producto}</span>
-                        </div>
-                    </td>
-                    <td>x${p.cantidad}</td>
+                    <td><span>${p.nombre_producto}</span></td>
+                    <td class="text-center">x${p.cantidad}</td>
                     <td class="text-end">${Number(p.subtotal).toLocaleString('es-CO',{style:'currency',currency:'COP'})}</td>
                 </tr>`;
         });
 
+        const userImg = f.imagen_usuario 
+            ? `<img src="${f.imagen_usuario}" class="rounded-circle me-3 shadow-sm border border-2 border-white" width="45" height="45" style="object-fit:cover;" onerror="this.onerror=null; this.src='https://cdn-icons-png.flaticon.com/512/149/149071.png';">`
+            : `<div class="rounded-circle me-3 bg-secondary d-flex align-items-center justify-content-center shadow-sm" style="width:45px; height:45px;"><i class="bi bi-person text-white"></i></div>`;
+
         card.innerHTML = `
-            <div class="invoice-header d-flex justify-content-between align-items-center">
-                <div class="d-flex align-items-center">
-                    <img src="${f.imagen_usuario || 'https://via.placeholder.com/50'}" class="rounded-circle me-3 shadow-sm border border-2 border-white" width="45" height="45" style="object-fit:cover;">
-                    <div>
-                        <h6 class="fw-bold mb-0">Factura #${f.numero_factura}</h6>
-                        <small class="text-muted">${new Date(f.fecha_emision).toLocaleString()}</small>
+            <div class="card-header bg-white pt-4 px-4 border-0">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center">
+                        ${userImg}
+                        <div>
+                            <h6 class="fw-bold mb-0">Factura #${f.numero_factura}</h6>
+                            <small class="text-muted">${new Date(f.fecha_emision).toLocaleString()}</small>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                         <button class="btn btn-sm btn-dark btn-pdf px-3"><i class="bi bi-download"></i> PDF</button>
+                         <span class="badge bg-dark rounded-pill px-3">${f.estado}</span>
                     </div>
                 </div>
-                <span class="badge ${f.estado==='Anulada'?'bg-secondary':'bg-dark'}">${f.estado}</span>
             </div>
-            <table class="table table-sm small table-borderless align-middle">
-                <tbody>${filas}</tbody>
-            </table>
-            <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top">
-                <button class="btn btn-sm btn-link text-danger p-0 btn-anular fw-bold" ${f.estado==='Anulada'?'disabled':''} style="text-decoration:none;">Anular pedido</button>
-                <div class="text-end">
-                    <small class="d-block text-muted">Total pagado</small>
-                    <span class="fw-bold fs-5">${total.toLocaleString('es-CO',{style:'currency',currency:'COP'})}</span>
+            <div class="card-body px-4">
+                <table class="table table-sm table-borderless align-middle mb-0">
+                    <thead>
+                        <tr class="text-muted small border-bottom">
+                            <th>PRODUCTO</th>
+                            <th class="text-center">CANT.</th>
+                            <th class="text-end">SUBTOTAL</th>
+                        </tr>
+                    </thead>
+                    <tbody>${filas}</tbody>
+                </table>
+            </div>
+            <div class="card-footer bg-light border-0 p-4">
+                <div class="d-flex justify-content-between align-items-center">
+                    <button class="btn btn-sm btn-link text-danger p-0 btn-anular fw-bold" ${f.estado==='Anulada'?'disabled':''} style="text-decoration:none;">Anular pedido</button>
+                    <div class="text-end">
+                        <small class="d-block text-muted">Total pagado</small>
+                        <span class="fw-bold fs-5 text-primary">${total.toLocaleString('es-CO',{style:'currency',currency:'COP'})}</span>
+                    </div>
                 </div>
             </div>`;
         
+        card.querySelector(".btn-pdf").onclick = () => descargarPDF(f);
         card.querySelector(".btn-anular").onclick = async () => {
-            if (await fetch(`/facturas/${f.id_factura}/anular`, { method: "PUT" })) {
-                showMessage("Pedido anulado");
-                f.estado = "Anulada";
-                mostrarFacturasBuscadas();
+            if (confirm("¿Anular pedido?")) {
+                const r = await fetch(`/facturas/${f.id_factura}/anular`, { method: "PUT" });
+                if (r.ok) { showMessage("Pedido anulado"); f.estado = "Anulada"; mostrarFacturasBuscadas(); }
             }
         };
         container.appendChild(card);
@@ -212,4 +282,13 @@ function paginar(total) {
 }
 
 document.getElementById("filtroEstado").onchange = mostrarFacturasBuscadas;
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/static/js/service-worker-carrito.js')
+            .then(() => console.log('SW registrado'))
+            .catch(console.error);
+    });
+}
+
 cargarCarrito();

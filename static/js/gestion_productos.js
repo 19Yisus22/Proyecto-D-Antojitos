@@ -11,16 +11,23 @@ const toastContainer = document.getElementById("toastContainer");
 const modal = new bootstrap.Modal(document.getElementById("modalPostre"));
 
 function showMessage(msg, isError = false) {
-    const toastEl = document.createElement('div');
-    toastEl.className = 'toast align-items-center text-bg-light border-0';
-    toastEl.setAttribute('role', 'alert');
-    toastEl.setAttribute('aria-live', 'assertive');
-    toastEl.setAttribute('aria-atomic', 'true');
-    toastEl.innerHTML = `<div class="d-flex"><div class="toast-body">${isError ? '❌' : '✅'} ${msg}</div><button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast"></button></div>`;
-    toastContainer.appendChild(toastEl);
-    const bsToast = new bootstrap.Toast(toastEl, { delay: 800 });
-    bsToast.show();
-    toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = 'custom-toast';
+    toast.innerHTML = `
+        <div class="d-flex align-items-center">
+            <i class="bi ${isError ? 'bi-x-circle text-danger' : 'bi-check-circle text-success'} me-3 fs-5"></i>
+            <span>${msg}</span>
+        </div>
+        <i class="bi bi-x-lg ms-3 btn-close-toast" style="cursor:pointer; font-size: 0.7rem;"></i>
+    `;
+    container.appendChild(toast);
+    const remove = () => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 400);
+    };
+    toast.querySelector('.btn-close-toast').onclick = remove;
+    setTimeout(remove, 3500);
 }
 
 btnAgregarPostre.addEventListener("click", () => formAgregarPostre.classList.remove("d-none"));

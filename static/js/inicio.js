@@ -1,3 +1,22 @@
+function playNotificationSound() {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); 
+    oscillator.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.1);
+
+    gainNode.gain.setValueAtTime(0.03, audioCtx.currentTime); 
+    gainNode.gain.exponentialRampToValueAtTime(0.005, audioCtx.currentTime + 0.2);
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    oscillator.start();
+    oscillator.stop(audioCtx.currentTime + 0.2);
+}
+
 async function cargarMarketing(){
     try {
         const res = await fetch("/api/publicidad/activa");
@@ -47,19 +66,32 @@ async function cargarMarketing(){
 function mostrarToast(imagen, titulo, descripcion){
     const cont = document.getElementById("toastContainer");
     if(!cont) return;
+
+    playNotificationSound();
+
     const t = document.createElement("div");
     t.className = "toast show bg-dark text-white border-light mb-2";
+    t.style.display = "block";
+    t.style.minWidth = "300px";
     t.innerHTML = `
         <div class="d-flex align-items-center p-2">
             <img src="${imagen}" style="width:50px;height:50px;object-fit:cover;border-radius:5px;" class="me-2">
             <div class="flex-grow-1">
-                <strong class="d-block">${titulo}</strong>
+                <strong class="d-block" style="color: #198754;">${titulo}</strong>
                 <small>${descripcion}</small>
             </div>
-            <button class="btn-close btn-close-white ms-2" data-bs-dismiss="toast"></button>
+            <button class="btn-close btn-close-white ms-2" style="font-size: 0.7rem;"></button>
         </div>`;
     cont.appendChild(t);
-    setTimeout(() => t.remove(), 6000);
+
+    const remove = () => {
+        t.style.opacity = '0';
+        t.style.transition = 'opacity 0.5s ease';
+        setTimeout(() => t.remove(), 500);
+    };
+
+    t.querySelector('.btn-close').onclick = remove;
+    setTimeout(remove, 3000);
 }
 
 async function mostrarNotificacionAleatoria(){
@@ -75,6 +107,7 @@ async function mostrarNotificacionAleatoria(){
 
 document.addEventListener("DOMContentLoaded", () => {
     cargarMarketing();
+    setTimeout(mostrarNotificacionAleatoria, 1000);
     setInterval(mostrarNotificacionAleatoria, 15000);
 });
 
