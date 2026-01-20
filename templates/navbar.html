@@ -34,7 +34,7 @@
               <li><a class="dropdown-item" href="/publicidad_page"><i class="bi bi-megaphone"></i> Sistema de Publicidad</a></li>
             {% endif %}
             <li><hr class="dropdown-divider"></li>
-            <li><a class="dropdown-item text-danger" href="/logout"><i class="bi bi-box-arrow-right"></i> Cerrar sesión</a></li>
+            <li><a class="dropdown-item text-danger logout-link" href="/logout?logout=true"><i class="bi bi-box-arrow-right"></i> Cerrar sesión</a></li>
           </ul>
         </li>
       </ul>
@@ -48,3 +48,15 @@
     </div>
   </div>
 </nav>
+
+<script>
+  document.querySelectorAll('.logout-link').forEach(link => {
+    link.addEventListener('click', () => {
+      sessionStorage.clear();
+      localStorage.clear();
+      if (window.google) {
+        google.accounts.id.disableAutoSelect();
+      }
+    });
+  });
+</script>

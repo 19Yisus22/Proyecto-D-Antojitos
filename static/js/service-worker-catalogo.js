@@ -65,8 +65,10 @@ async function enviarCarritoPendiente() {
     return Promise.all(
         requests.map(async (request) => {
             try {
-                await fetch(request);
-                await cache.delete(request);
+                const response = await fetch(request.clone());
+                if (response.ok) {
+                    await cache.delete(request);
+                }
             } catch (err) {
                 console.error("Fallo sincronización", err);
             }

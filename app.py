@@ -1,7 +1,11 @@
+import requests
 from waitress import serve
 from flask_cors import CORS
 from dotenv import load_dotenv
+from datetime import timedelta
 from supabase import create_client
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 import os, uuid, socket, secrets, logging, hashlib, websockets, cloudinary, cloudinary.uploader, json
 
@@ -32,15 +36,16 @@ supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME")
 CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY")
 CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET")
+CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 
 if not CLOUDINARY_CLOUD_NAME or not CLOUDINARY_API_KEY or not CLOUDINARY_API_SECRET:
     raise ValueError("Faltan las credenciales de Cloudinary en el archivo .env")
-
 cloudinary.config( cloud_name=CLOUDINARY_CLOUD_NAME, api_key=CLOUDINARY_API_KEY, api_secret=CLOUDINARY_API_SECRET)
 
 # CONFIGURACION DE FLASK
 FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY") or secrets.token_hex(24)
 app = Flask(__name__, template_folder=TEMPLATES_DIR, static_folder=STATIC_DIR)
+app.permanent_session_lifetime = timedelta(days=7)
 app.secret_key = FLASK_SECRET_KEY
 CORS(app, supports_credentials=True)
 logging.getLogger('waitress').setLevel(logging.ERROR)
@@ -110,36 +115,7 @@ def index():
         return render_template("inicio.html", mensaje="Extensión de archivo no permitida")
     return render_template("inicio.html")
 
-@app.route("/login", methods=["GET", "POST"])
-def login():
-
-    if request.method == "GET":
-        return render_template("login.html")
-    
-    if not request.is_json:
-        return jsonify({"ok": False, "error": "Content-Type application/json requerido"}), 415
-    data = request.get_json()
-    correo = data.get("correo", "").strip().lower()
-    contrasena = data.get("contrasena", "")
-
-    if not correo or not contrasena:
-        return jsonify({"ok": False, "error": "Debes ingresar correo y contraseña"}), 400
-    res = supabase.table("usuarios").select("*, roles(nombre_role)").eq("correo", correo).execute()
-
-    if not res.data:
-        return jsonify({"ok": False, "error": "Correo o contraseña incorrectos"}), 401
-    user = res.data[0]
-
-    if not verify_password(contrasena, user["contrasena"]):
-        return jsonify({"ok": False, "error": "Correo o contraseña incorrectos"}), 401
-    permisos_res = supabase.table("roles_permisos").select("permisos(nombre_permiso)").eq("id_role", user["id_role"]).execute()
-    permisos = [p["permisos"]["nombre_permiso"] for p in permisos_res.data if p.get("permisos")]
-    session["user_id"] = user["id_cliente"]
-    session["rol"] = user["roles"]["nombre_role"]
-    session["permisos"] = permisos
-    session["user"] = user 
-    session["just_logged_in"] = True
-    return jsonify({"ok": True, "redirect": "/inicio", "user": user, "permisos": permisos}), 200
+# APARTADO DE AUTENTICACIÓN
 
 @app.route("/inicio")
 def inicio():
@@ -210,6 +186,118 @@ def registro():
     
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 400
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+
+    if request.method == "GET":
+        return render_template("login.html")
+    
+    if not request.is_json:
+        return jsonify({"ok": False, "error": "Content-Type application/json requerido"}), 415
+    data = request.get_json()
+    correo = data.get("correo", "").strip().lower()
+    contrasena = data.get("contrasena", "")
+
+    if not correo or not contrasena:
+        return jsonify({"ok": False, "error": "Debes ingresar correo y contraseña"}), 400
+    res = supabase.table("usuarios").select("*, roles(nombre_role)").eq("correo", correo).execute()
+
+    if not res.data:
+        return jsonify({"ok": False, "error": "Correo o contraseña incorrectos"}), 401
+    user = res.data[0]
+
+    if not verify_password(contrasena, user["contrasena"]):
+        return jsonify({"ok": False, "error": "Correo o contraseña incorrectos"}), 401
+    permisos_res = supabase.table("roles_permisos").select("permisos(nombre_permiso)").eq("id_role", user["id_role"]).execute()
+    permisos = [p["permisos"]["nombre_permiso"] for p in permisos_res.data if p.get("permisos")]
+    session["user_id"] = user["id_cliente"]
+    session["rol"] = user["roles"]["nombre_role"]
+    session["permisos"] = permisos
+    session["user"] = user 
+    session["just_logged_in"] = True
+    return jsonify({"ok": True, "redirect": "/inicio", "user": user, "permisos": permisos}), 200
+
+@app.route("/obtener-cliente-id", methods=["GET"])
+def obtener_cliente_id():
+
+    cliente_id = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+
+    if not cliente_id:
+        return jsonify({"error": "Variable de entorno no configurada"}), 500
+    return jsonify({"client_id": cliente_id})
+
+@app.after_request
+def agregar_cabeceras(response):
+    
+    response.headers['Cross-Origin-Opener-Policy'] = 'same-origin-allow-popups'
+    response.headers['Cross-Origin-Resource-Policy'] = 'cross-origin'
+    return response
+
+@app.route("/registro-google", methods=["POST"])
+def registro_google():
+
+    data = request.get_json()
+    token = data.get("token")
+    
+    try:
+
+        google_verify = requests.get(f"https://oauth2.googleapis.com/tokeninfo?id_token={token}")
+        
+        if google_verify.status_code != 200:
+            return jsonify({"ok": False, "error": "Token no válido"}), 400 
+        idinfo = google_verify.json()
+        client_id_env = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+
+        if idinfo["aud"] != client_id_env:
+            return jsonify({"ok": False, "error": "ID de cliente no coincide"}), 400
+        correo = idinfo['email']
+        res_user = supabase.table("usuarios").select("*, roles(nombre_role)").eq("correo", correo).execute()
+
+        if res_user.data:
+            user = res_user.data[0]
+            session.permanent = True
+            session["user_id"] = user["id_cliente"]
+            session["user"] = user
+            session["rol"] = user.get("roles", {}).get("nombre_role", "cliente")
+            return jsonify({
+                "ok": True, 
+                "mensaje": "Bienvenido", 
+                "redireccion": "/inicio",
+                "user": user}), 200
+
+        nuevo_usuario = {
+            "cedula": f"G-{uuid.uuid4().hex[:8]}",
+            "nombre": idinfo.get('given_name', ''),
+            "apellido": idinfo.get('family_name', ''),
+            "correo": correo,
+            "contrasena": "GOOGLE_AUTH_EXTERNAL",
+            "metodo_pago": "Efectivo",
+            "imagen_url": idinfo.get('picture', "static/uploads/default_icon_profile.png"),
+            "telefono": ""
+        }
+        
+        res_insert = supabase.table("usuarios").insert(nuevo_usuario).execute()
+
+        if res_insert.data:
+
+            user = res_insert.data[0]
+            res_user_full = supabase.table("usuarios").select("*, roles(nombre_role)").eq("id_cliente", user["id_cliente"]).execute()
+            user_data = res_user_full.data[0] if res_user_full.data else user
+            
+            session.permanent = True
+            session["user_id"] = user_data["id_cliente"]
+            session["user"] = user_data
+            session["rol"] = user_data.get("roles", {}).get("nombre_role", "cliente")
+            
+            return jsonify({
+                "ok": True, 
+                "mensaje": "Registro exitoso", 
+                "redireccion": "/inicio",
+                "user": user_data}), 201
+            
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
     
 @app.route("/logout")
 def logout():
@@ -1287,6 +1375,7 @@ def eliminar_imagen_suelta():
         return jsonify({"ok": True})
     return jsonify({"ok": False}), 400
 
+
 # APARTADO DEL APP RUN
 
 def get_local_ip():
@@ -1310,7 +1399,7 @@ if __name__ == "__main__":
     port = 8000
     local_ip = get_local_ip()
 
-    debug_mode = False  # Cambia a True para modo debug  
+    debug_mode = True  # Cambia a True para modo debug  
 
     if debug_mode:
         print("⚡ Ejecutando en modo DEBUG con servidor de desarrollo de Flask")

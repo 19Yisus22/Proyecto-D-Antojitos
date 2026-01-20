@@ -10,9 +10,7 @@ function showMessage(msg, isError = false) {
     toastEl.style.minWidth = "250px";
     toastEl.innerHTML = `
         <div class="d-flex">
-            <div class="toast-body">
-                <i class="bi ${isError ? 'bi-exclamation-triangle' : 'bi-check-circle'} me-2"></i>${msg}
-            </div>
+            <div class="toast-body"><i class="bi ${isError ? 'bi-exclamation-triangle' : 'bi-check-circle'} me-2"></i>${msg}</div>
             <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
         </div>`;
     toastContainer.appendChild(toastEl);
@@ -23,6 +21,7 @@ const passInput = document.getElementById("nuevaContrasena");
 const confirmInput = document.getElementById("confirmarContrasena");
 
 function validarPass() {
+    if (USER_AUTH_GOOGLE) return;
     const p = passInput.value;
     const c = confirmInput.value;
     if (!c) { confirmInput.className = "form-control custom-input"; return; }
@@ -50,7 +49,13 @@ const inputs = document.querySelectorAll('#formPerfil input, #formPerfil textare
 
 if (btnEditarPerfil) {
     btnEditarPerfil.addEventListener("click", () => {
-        inputs.forEach(i => i.disabled = false);
+        inputs.forEach(i => {
+            if (i.id !== "cedulaPerfil" && i.id !== "correoPerfil") i.disabled = false;
+        });
+        if (USER_AUTH_GOOGLE) {
+            document.getElementById("nuevaContrasena").disabled = true;
+            document.getElementById("confirmarContrasena").disabled = true;
+        }
         btnActualizarPerfil.style.display = "inline-block";
         btnEditarPerfil.style.display = "none";
         showMessage("Edición habilitada");
@@ -70,17 +75,17 @@ document.getElementById("formPerfil").addEventListener("submit", async e => {
     } else showMessage(data.error || "Error al actualizar", true);
 });
 
-document.getElementById("btnCambiarContrasena").addEventListener("click", async () => {
-    const n = passInput.value.trim();
-    if (!n || n !== confirmInput.value.trim()) { showMessage("Contraseñas no coinciden", true); return; }
-    const res = await fetch("/cambiar_contrasena", { 
-        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nueva: n }) 
+if (document.getElementById("btnCambiarContrasena")) {
+    document.getElementById("btnCambiarContrasena").addEventListener("click", async () => {
+        if (USER_AUTH_GOOGLE) return;
+        const n = passInput.value.trim();
+        if (!n || n !== confirmInput.value.trim()) { showMessage("Contraseñas no coinciden", true); return; }
+        const res = await fetch("/cambiar_contrasena", { 
+            method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nueva: n }) 
+        });
+        if (res.ok) { showMessage("Contraseña cambiada con éxito"); passInput.value = ""; confirmInput.value = ""; }
     });
-    if (res.ok) {
-        showMessage("Contraseña cambiada con éxito");
-        passInput.value = ""; confirmInput.value = "";
-    }
-});
+}
 
 if (USER_ROLE === 'admin') {
     const myModal = new bootstrap.Modal(document.getElementById('imgModal'));
@@ -91,9 +96,9 @@ if (USER_ROLE === 'admin') {
         if (res.ok) {
             let data = await res.json();
             allUsers = data.sort((a, b) => {
-                const rolA = (a.roles?.nombre_role || a.rol) === 'admin' ? 0 : 1;
-                const rolB = (b.roles?.nombre_role || b.rol) === 'admin' ? 0 : 1;
-                return rolA - rolB;
+                const rA = (a.roles?.nombre_role || a.rol) === 'admin' ? 0 : 1;
+                const rB = (b.roles?.nombre_role || b.rol) === 'admin' ? 0 : 1;
+                return rA - rB;
             });
             filteredUsers = [...allUsers];
             renderUserTable();
@@ -101,15 +106,7 @@ if (USER_ROLE === 'admin') {
     }
 
     async function cambiarRol(id, nuevo) {
-        if (String(id) === String(USER_ID)) return showMessage("No puedes cambiar tu propio rol", true);
-        
-        if (nuevo === 'admin') {
-            const admins = allUsers.filter(u => (u.roles?.nombre_role || u.rol) === 'admin');
-            if (admins.length >= 3) {
-                return showMessage("Límite de 3 administradores alcanzado. No se pueden asignar más.", true);
-            }
-        }
-
+        if (String(id) === String(USER_ID)) return showMessage("Acción no permitida", true);
         const res = await fetch("/actualizar_rol_usuario", {
             method: "PUT", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ id: id, rol: nuevo })
@@ -122,28 +119,33 @@ if (USER_ROLE === 'admin') {
         list.innerHTML = "";
         const start = (currentPage - 1) * recordsPerPage;
         const pageItems = filteredUsers.slice(start, start + recordsPerPage);
-        document.getElementById("countUsers").textContent = allUsers.length;
-        document.getElementById("countVisible").textContent = filteredUsers.length;
-
+        
         pageItems.forEach(u => {
             const div = document.createElement("div");
             div.className = "list-group-item d-flex align-items-center justify-content-between py-3 fade-in";
             const rol = u.roles?.nombre_role || u.rol;
-            const nuevo = rol === 'admin' ? 'cliente' : 'admin';
             const esYo = String(u.id_cliente) === String(USER_ID);
+            const esGoogle = u.contrasena === "GOOGLE_AUTH_EXTERNAL";
 
             div.innerHTML = `
                 <div class="d-flex align-items-center">
                     <img src="${u.imagen_url || '/static/default_icon_profile.png'}" class="rounded-circle me-3 border shadow-sm" width="45" height="45" style="object-fit:cover;">
                     <div>
-                        <h6 class="mb-0 fw-bold">${u.nombre} ${u.apellido} ${esYo ? '<span class="badge bg-secondary ms-1">Tú</span>' : ''}</h6>
+                        <h6 class="mb-0 fw-bold">${u.nombre} ${u.apellido} ${esYo ? '<span class="badge bg-secondary ms-1" style="font-size:0.6rem">TÚ</span>' : ''}</h6>
                         <small class="text-muted">${u.correo}</small>
                     </div>
                 </div>
-                <div class="d-flex align-items-center gap-2">
-                    <span class="badge ${rol === 'admin' ? 'bg-danger' : 'bg-primary'} rounded-pill px-3">${rol}</span>
-                    <button class="btn btn-sm btn-outline-dark" ${esYo ? 'disabled' : ''} id="btnRol-${u.id_cliente}"><i class="bi bi-person-gear"></i></button>
-                    <button class="btn btn-sm btn-light border" id="btnVer-${u.id_cliente}"><i class="bi bi-eye"></i></button>
+                <div class="d-flex align-items-center gap-4">
+                    <div class="text-center" style="min-width:85px;">
+                        <span class="badge ${rol === 'admin' ? 'bg-danger' : 'bg-primary'} rounded-pill px-3 mb-1" style="font-size:0.65rem">${rol.toUpperCase()}</span>
+                        <div class="auth-icon-container">
+                            ${esGoogle ? `<img src="${GOOGLE_LOGO_PATH}" width="18" alt="Google">` : '<i class="bi bi-envelope-at text-muted"></i>'}
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-outline-dark" ${esYo ? 'disabled' : ''} id="btnRol-${u.id_cliente}"><i class="bi bi-person-gear"></i></button>
+                        <button class="btn btn-sm btn-light border" id="btnVer-${u.id_cliente}"><i class="bi bi-eye"></i></button>
+                    </div>
                 </div>`;
             
             list.appendChild(div);
@@ -158,12 +160,14 @@ if (USER_ROLE === 'admin') {
                 document.getElementById("modalDireccion").textContent = u.direccion || 'N/A';
                 document.getElementById("modalFecha").textContent = new Date(u.fecha_creacion).toLocaleDateString();
                 document.getElementById("modalRol").textContent = rol.toUpperCase();
+                
+                document.getElementById("modalAuthIcon").innerHTML = esGoogle 
+                    ? `<span class="badge bg-white text-dark border shadow-sm p-1 px-2"><img src="${GOOGLE_LOGO_PATH}" width="14" class="me-1"> Google</span>` 
+                    : '<span class="badge bg-dark text-white p-1 px-2"><i class="bi bi-envelope-at me-1"></i> Local</span>';
+                    
                 myModal.show();
             };
-            
-            if(!esYo) {
-                document.getElementById(`btnRol-${u.id_cliente}`).onclick = () => cambiarRol(u.id_cliente, nuevo);
-            }
+            if(!esYo) document.getElementById(`btnRol-${u.id_cliente}`).onclick = () => cambiarRol(u.id_cliente, rol === 'admin' ? 'cliente' : 'admin');
         });
         renderPagination();
     }
@@ -187,33 +191,5 @@ if (USER_ROLE === 'admin') {
         currentPage = 1; renderUserTable();
     });
 
-    document.getElementById("btnExportarExcel").onclick = () => {
-        if (allUsers.length === 0) return showMessage("No hay datos", true);
-        const wsData = allUsers.map(u => ({
-            "FECHA REGISTRO": new Date(u.fecha_creacion).toLocaleDateString(),
-            "ROL": (u.roles?.nombre_role || u.rol).toUpperCase(),
-            "NOMBRE": u.nombre,
-            "APELLIDO": u.apellido,
-            "CÉDULA": u.cedula || 'N/A',
-            "CORREO": u.correo,
-            "TELÉFONO": u.telefono || 'N/A',
-            "DIRECCIÓN": u.direccion || 'N/A',
-            "MÉTODO PAGO": u.metodo_pago || 'N/A'
-        }));
-        const ws = XLSX.utils.json_to_sheet(wsData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Usuarios");
-        XLSX.writeFile(wb, `Reporte_D_Antojitos_${new Date().getTime()}.xlsx`);
-    };
-
-    document.getElementById("btnEliminarUsuario").onclick = async () => {
-        const c = document.getElementById("correoEliminar").value.trim().toLowerCase();
-        if (!c) return showMessage("Ingresa un correo", true);
-        const res = await fetch("/eliminar_usuario_por_correo", { 
-            method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ correo: c })
-        });
-        if (res.ok) { showMessage("Usuario eliminado"); fetchUsuarios(); document.getElementById("correoEliminar").value = ""; }
-        else showMessage("No se pudo eliminar", true);
-    };
     fetchUsuarios();
 }

@@ -248,3 +248,7 @@ window.onload = () => {
     setTimeout(mostrarNotificacionAleatoria, 1000);
     setInterval(mostrarNotificacionAleatoria, 15000);
 };
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('/static/js/service-worker-catalogo.js').then(() => console.log('SW registrado')).catch(console.error));
+}
