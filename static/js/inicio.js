@@ -63,25 +63,33 @@ async function cargarMarketing(){
     }
 }
 
-function mostrarToast(imagen, titulo, descripcion){
+function mostrarToastPublicidad(imagen, titulo, descripcion, isError = false) {
     const cont = document.getElementById("toastContainer");
-    if(!cont) return;
+    if (!cont) return;
 
     playNotificationSound();
 
     const t = document.createElement("div");
     t.className = "toast show bg-dark text-white border-light mb-2";
     t.style.display = "block";
-    t.style.minWidth = "300px";
+    t.style.minWidth = "320px";
+    
+    const textColor = isError ? '#dc3545' : '#198754';
+    const iconClass = isError ? 'bi-x-circle-fill' : 'bi-check-circle-fill';
+
     t.innerHTML = `
         <div class="d-flex align-items-center p-2">
-            <img src="${imagen}" style="width:50px;height:50px;object-fit:cover;border-radius:5px;" class="me-2">
+            <img src="${imagen}" style="width:55px;height:55px;object-fit:cover;border-radius:8px;" class="me-3 shadow-sm">
             <div class="flex-grow-1">
-                <strong class="d-block" style="color: #198754;">${titulo}</strong>
-                <small>${descripcion}</small>
+                <div class="d-flex align-items-center mb-1">
+                    <i class="bi ${iconClass} me-2" style="color: ${textColor};"></i>
+                    <strong style="color: ${textColor};" class="mb-0">${titulo}</strong>
+                </div>
+                <small class="text-white-50">${descripcion}</small>
             </div>
             <button class="btn-close btn-close-white ms-2" style="font-size: 0.7rem;"></button>
         </div>`;
+
     cont.appendChild(t);
 
     const remove = () => {
@@ -100,7 +108,7 @@ async function mostrarNotificacionAleatoria(){
         const data = await res.json();
         if(data && data.length > 0) {
             const aleatorio = data[Math.floor(Math.random()*data.length)];
-            mostrarToast(aleatorio.imagen_url, aleatorio.titulo, aleatorio.descripcion);
+            mostrarToastPublicidad(aleatorio.imagen_url, aleatorio.titulo, aleatorio.descripcion);
         }
     } catch (e) {}
 }
