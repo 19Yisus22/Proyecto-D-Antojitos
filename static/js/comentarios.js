@@ -61,12 +61,40 @@ function renderComentario(c) {
             dd.style.left = `${r.left + window.scrollX - 100}px`;
             dd.style.position = "absolute";
             dd.querySelectorAll("li")[0].onclick = () => iniciarEdicion(c.id, c.mensaje);
-            dd.querySelectorAll("li")[1].onclick = () => eliminarComentario(c.id);
+            dd.querySelectorAll("li")[1].onclick = () => ejecutarEliminacionDirecta(c.id);
             document.body.appendChild(dd);
             document.addEventListener("click", () => dd.remove(), {once:true});
         };
     }
     return div;
+}
+
+async function ejecutarEliminacionDirecta(id) {
+    const el = document.getElementById(`msg-${id}`);
+    if(el) {
+        el.style.opacity = '0.5';
+        el.style.pointerEvents = 'none';
+    }
+
+    try {
+        const res = await fetch(`/comentarios/${id}`, {method:"DELETE"});
+        if(res.ok) {
+            if(el) {
+                el.style.transform = 'scale(0.9)';
+                el.style.opacity = '0';
+                setTimeout(() => {
+                    el.remove();
+                    showMessage("Comentario eliminado correctamente");
+                }, 300);
+            }
+        } else {
+            if(el) el.style.opacity = '1';
+            showMessage("No se pudo eliminar", true);
+        }
+    } catch(e) {
+        if(el) el.style.opacity = '1';
+        showMessage("Error de conexión", true);
+    }
 }
 
 async function cargarComentarios() {
@@ -90,6 +118,11 @@ function iniciarEdicion(id, msg) {
 sendBtn.onclick = async () => {
     const mensaje = mensajeInput.value.trim();
     if(!mensaje) return;
+
+    const originalContent = sendBtn.innerHTML;
+    sendBtn.disabled = true;
+    sendBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>${editandoComentario ? 'Guardando...' : 'Enviando...'}`;
+
     try {
         let res, url = "/comentarios", method = "POST";
         if(editandoComentario) {
@@ -107,25 +140,28 @@ sendBtn.onclick = async () => {
             editandoComentario = null;
             sendBtn.innerHTML = `<i class="bi bi-send me-2"></i>Enviar Sugerencia`;
             cargarComentarios();
+        } else {
+            showMessage("Error al procesar", true);
+            sendBtn.innerHTML = originalContent;
         }
-    } catch(e) { showMessage("Error de red", true); }
+    } catch(e) { 
+        showMessage("Error de red", true); 
+        sendBtn.innerHTML = originalContent;
+    } finally {
+        sendBtn.disabled = false;
+    }
 };
-
-async function eliminarComentario(id) {
-    if(!confirm("¿Eliminar comentario?")) return;
-    try {
-        const res = await fetch(`/comentarios/${id}`, {method:"DELETE"});
-        if(res.ok) {
-            const el = document.getElementById(`msg-${id}`);
-            el.style.opacity = '0';
-            el.style.transform = 'scale(0.9)';
-            setTimeout(() => { el.remove(); showMessage("Eliminado"); }, 300);
-        }
-    } catch(e) { showMessage("Error al eliminar", true); }
-}
 
 cargarComentarios();
 
 if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => navigator.serviceWorker.register('/static/js/service-worker-comentarios.js').then(() => console.log('SW registrado')).catch(console.error));
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/static/js/workers/service-worker-comentarios.js')
+        .then(reg => {
+            console.log('SW registrado correctamente');
+        })
+        .catch(error => {
+            console.error('Error al registrar el SW:', error);
+        });
+    });
 }

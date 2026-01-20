@@ -5,16 +5,27 @@ const linkInicio = document.getElementById("linkInicio");
 
 function showMessage(msg, isSuccess = false) {
     const toastEl = document.createElement('div');
-    toastEl.className = 'toast align-items-center text-bg-light border-0';
-    toastEl.setAttribute('role', 'alert');
+    toastEl.className = 'custom-toast';
+    toastEl.style.position = 'fixed';
+    toastEl.style.bottom = '20px';
+    toastEl.style.left = '20px';
+    toastEl.style.zIndex = '9999';
     toastEl.innerHTML = `
-        <div class="d-flex">
-            <div class="toast-body">${isSuccess ? '✅' : '❌'} ${msg}</div>
-            <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast"></button>
+        <div class="d-flex align-items-center">
+            <i class="bi ${isSuccess ? 'bi-check-circle text-success' : 'bi-x-circle text-danger'} me-3 fs-5"></i>
+            <span>${msg}</span>
         </div>
+        <i class="bi bi-x-lg ms-3 btn-close-toast" style="cursor:pointer; font-size: 0.7rem;"></i>
     `;
     toastContainer.appendChild(toastEl);
-    new bootstrap.Toast(toastEl, { delay: 3000 }).show();
+    
+    const remove = () => {
+        toastEl.style.opacity = '0';
+        setTimeout(() => toastEl.remove(), 400);
+    };
+    
+    toastEl.querySelector('.btn-close-toast').onclick = remove;
+    setTimeout(remove, 3500);
 }
 
 function limpiarEstadoAuth() {
@@ -37,7 +48,9 @@ async function manejarRespuestaGoogle(response) {
             if (data.user) {
                 sessionStorage.setItem("user", JSON.stringify(data.user));
             }
-            showMessage(data.mensaje || "Bienvenido", true);
+            
+            showMessage("Bienvenido Cliente", true);
+            
             setTimeout(() => {
                 window.location.href = data.redireccion || "/inicio";
             }, 1500);
@@ -142,4 +155,14 @@ if (linkInicio) {
     });
 }
 
-if ('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/static/js/service-worker-login.js').catch(console.error);});}
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/static/js/workers/service-worker-registro.js')
+        .then(reg => {
+            console.log('SW registrado correctamente');
+        })
+        .catch(error => {
+            console.error('Error al registrar el SW:', error);
+        });
+    });
+}

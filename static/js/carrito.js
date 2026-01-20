@@ -24,7 +24,10 @@ function showMessage(msg, isError = false) {
 
 async function descargarPDF(f) {
     const { jsPDF } = window.jspdf || window.jsPDF;
-    if (!jsPDF) return;
+    if (!jsPDF) {
+        showMessage("Error al cargar generador de PDF", true);
+        return;
+    }
     
     const doc = new jsPDF();
     const logoUrl = '/static/uploads/logo.png';
@@ -53,7 +56,6 @@ async function descargarPDF(f) {
     doc.text(`Factura N°: ${f.numero_factura}`, 145, 20);
     doc.text(`Fecha: ${new Date(f.fecha_emision).toLocaleString()}`, 145, 25);
     
-    // Estado de la factura resaltado
     doc.setFont("helvetica", "bold");
     doc.setTextColor(f.estado === 'Anulada' ? 220 : 40, f.estado === 'Anulada' ? 53 : 167, f.estado === 'Anulada' ? 69 : 69);
     doc.text(`ESTADO: ${f.estado.toUpperCase()}`, 145, 30);
@@ -80,34 +82,45 @@ async function descargarPDF(f) {
     doc.setTextColor(0);
     doc.text(`TOTAL: ${total.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}`, 195, finalY + 12, { align: 'right' });
 
-    // Mensaje final centrado y estilizado
     doc.setFontSize(11);
     doc.setFont("helvetica", "italic");
     doc.setTextColor(100);
     const mensaje1 = "Espere a que se procese el pedido en el sistema.";
     const mensaje2 = "¡Gracias por la compra!";
-    
     const textWidth1 = doc.getStringUnitWidth(mensaje1) * doc.internal.getFontSize() / doc.internal.scaleFactor;
     const textWidth2 = doc.getStringUnitWidth(mensaje2) * doc.internal.getFontSize() / doc.internal.scaleFactor;
-    
     doc.text(mensaje1, (210 - textWidth1) / 2, finalY + 30);
     doc.setFont("helvetica", "bolditalic");
     doc.text(mensaje2, (210 - textWidth2) / 2, finalY + 38);
 
     doc.save(`Factura_${f.numero_factura}.pdf`);
+    showMessage("PDF generado y descargado correctamente");
 }
 
 async function cargarCarrito() {
     const container = document.getElementById("carritoContainer");
     const btn = document.getElementById("btnFinalizarCompra");
-    container.innerHTML = "";
-    btn.style.display = "none";
+    
     try {
         const res = await fetch("/obtener_carrito");
         if (!res.ok) return;
         const data = await res.json();
+        
+        let cantidadTotalItems = 0;
+        if (data.productos && data.productos.length > 0) {
+            data.productos.forEach(item => {
+                cantidadTotalItems += item.cantidad;
+            });
+        }
+
+        actualizarContadorBadge(cantidadTotalItems);
+
+        if (!container) return;
+        container.innerHTML = "";
+
         if (!data.productos || data.productos.length === 0) {
             container.innerHTML = '<div class="p-5 text-center text-muted"><i class="bi bi-cart-x fs-1"></i><p class="mt-2">El carrito está vacío</p></div>';
+            if (btn) btn.style.display = "none";
             return;
         }
 
@@ -131,6 +144,7 @@ async function cargarCarrito() {
             const sub = Number(item.precio_unitario) * Number(item.cantidad);
             totalGeneral += sub;
             const tr = document.createElement("tr");
+            tr.style.transition = "all 0.4s ease";
             
             const imgPath = item.imagen || item.imagen_url;
             const fotoHtml = imgPath 
@@ -149,49 +163,148 @@ async function cargarCarrito() {
                 <td>${sub.toLocaleString('es-CO',{style:'currency',currency:'COP'})}</td>
                 <td class="text-center"><button class="btn btn-sm btn-outline-danger btn-quitar"><i class="bi bi-trash"></i></button></td>`;
             
-            tr.querySelector(".btn-quitar").onclick = async () => {
+            tr.querySelector(".btn-quitar").onclick = async (e) => {
+                const btnQuitar = e.currentTarget;
+                btnQuitar.disabled = true;
+                btnQuitar.innerHTML = `<span class="spinner-border spinner-border-sm"></span>`;
+
                 const r = await fetch(`/carrito_quitar/${item.id_carrito}`, { method: "DELETE" });
-                if (r.ok) { showMessage("Eliminado"); cargarCarrito(); }
+                if (r.ok) { 
+                    tr.style.opacity = "0";
+                    tr.style.transform = "translateX(20px)";
+                    setTimeout(() => {
+                        cargarCarrito();
+                        showMessage("Producto eliminado");
+                    }, 400);
+                } else {
+                    btnQuitar.disabled = false;
+                    btnQuitar.innerHTML = `<i class="bi bi-trash"></i>`;
+                }
             };
             tbody.appendChild(tr);
         });
 
-        document.getElementById("totalCarritoFinal").textContent = totalGeneral.toLocaleString('es-CO',{style:'currency',currency:'COP'});
-        btn.style.display = "inline-block";
+        const totalEl = document.getElementById("totalCarritoFinal");
+        if (totalEl) totalEl.textContent = totalGeneral.toLocaleString('es-CO',{style:'currency',currency:'COP'});
+        if (btn) btn.style.display = "inline-block";
+
     } catch(e) { console.error(e); }
 }
 
-async function finalizarCompra() {
-    const res = await fetch("/finalizar_compra", { method: "POST" });
-    const data = await res.json();
-    if (res.ok) {
-        showMessage("¡Pedido enviado!");
-        cargarCarrito();
-    } else {
-        showMessage(data.message, true);
+function actualizarContadorBadge(total) {
+    const badge = document.getElementById('contadorCarritoBadge');
+    const totalInt = parseInt(total) || 0;
+    const countAnterior = localStorage.getItem('cant_carrito');
+    localStorage.setItem('cant_carrito', totalInt);
+
+    if (badge) {
+        if (totalInt > 0) {
+            badge.textContent = totalInt > 99 ? '99+' : totalInt;
+            badge.style.display = "flex";
+            if (countAnterior != totalInt) {
+                badge.classList.remove('badge-bounce');
+                void badge.offsetWidth; 
+                badge.classList.add('badge-bounce');
+            }
+        } else {
+            badge.style.display = "none";
+        }
     }
 }
 
-document.getElementById("btnFinalizarCompra").onclick = finalizarCompra;
-
-document.getElementById("buscarFactura").oninput = async function() {
-    const val = this.value.trim();
-    if (!val) { facturasActuales = []; mostrarFacturasBuscadas(); return; }
-    const res = await fetch(`/buscar_facturas?cedula=${val}`);
-    if (res.ok) {
-        facturasActuales = (await res.json()).sort((a,b) => new Date(b.fecha_emision) - new Date(a.fecha_emision));
-        paginaActual = 1;
-        mostrarFacturasBuscadas();
+document.addEventListener('DOMContentLoaded', () => {
+    const savedCount = localStorage.getItem('cant_carrito');
+    if (savedCount && parseInt(savedCount) > 0) {
+        actualizarContadorBadge(savedCount);
     }
-};
+    cargarCarrito();
+});
+
+async function finalizarCompra() {
+    const btn = document.getElementById("btnFinalizarCompra");
+    if (!btn) return;
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Validando Stock...`;
+
+    try {
+        const checkRes = await fetch("/obtener_catalogo");
+        const catalogo = await checkRes.json();
+        const resCarrito = await fetch("/obtener_carrito");
+        const miCarrito = await resCarrito.json();
+
+        let stockInsuficiente = false;
+        miCarrito.productos.forEach(item => {
+            const pReal = catalogo.productos.find(p => p.id_producto == item.id_producto);
+            if (pReal && item.cantidad > pReal.stock) {
+                stockInsuficiente = true;
+                showMessage(`Stock insuficiente para ${item.nombre_producto}. Disponible: ${pReal.stock}`, true);
+            }
+        });
+
+        if (stockInsuficiente) {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+            await cargarCarrito();
+            return;
+        }
+
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Procesando...`;
+        const res = await fetch("/finalizar_compra", { 
+            method: "POST",
+            headers: { "Content-Type": "application/json" }
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+            if (res.status === 400 && data.completar_perfil) {
+                showMessage(data.message, true);
+                setTimeout(() => { window.location.href = "/mi_perfil"; }, 1000);
+            } else {
+                showMessage(data.message || "Error al procesar el pedido", true);
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+            return;
+        }
+
+        showMessage("¡Pedido enviado con éxito!");
+        actualizarContadorBadge(0);
+        await cargarCarrito();
+        
+    } catch (error) {
+        showMessage("Error de conexión con el servidor", true);
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+}
+
+const btnFinalizar = document.getElementById("btnFinalizarCompra");
+if (btnFinalizar) btnFinalizar.onclick = finalizarCompra;
+
+const inputBuscar = document.getElementById("buscarFactura");
+if (inputBuscar) {
+    inputBuscar.oninput = async function() {
+        const val = this.value.trim();
+        if (!val) { facturasActuales = []; mostrarFacturasBuscadas(); return; }
+        const res = await fetch(`/buscar_facturas?cedula=${val}`);
+        if (res.ok) {
+            facturasActuales = (await res.json()).sort((a,b) => new Date(b.fecha_emision) - new Date(a.fecha_emision));
+            paginaActual = 1;
+            mostrarFacturasBuscadas();
+        }
+    };
+}
 
 function mostrarFacturasBuscadas() {
     const container = document.getElementById("facturasContainer");
+    if (!container) return;
     container.innerHTML = "";
-    const filter = document.getElementById("filtroEstado").value;
+    const filtro = document.getElementById("filtroEstado");
+    const filter = filtro ? filtro.value : "";
+    
     let filtradas = facturasActuales;
     if (filter && filter !== "") filtradas = facturasActuales.filter(f => f.estado === filter);
-
     const inicio = (paginaActual - 1) * itemsPorPagina;
     const paginadas = filtradas.slice(inicio, inicio + itemsPorPagina);
 
@@ -251,7 +364,7 @@ function mostrarFacturasBuscadas() {
                 <div class="d-flex justify-content-between align-items-center">
                     <button class="btn btn-sm btn-link text-danger p-0 btn-anular fw-bold" ${f.estado==='Anulada'?'disabled':''} style="text-decoration:none;">Anular pedido</button>
                     <div class="text-end">
-                        <small class="d-block text-muted">Total pagado</small>
+                        <small class="text-muted d-block">Total pagado</small>
                         <span class="fw-bold fs-5 text-primary">${total.toLocaleString('es-CO',{style:'currency',currency:'COP'})}</span>
                     </div>
                 </div>
@@ -271,6 +384,7 @@ function mostrarFacturasBuscadas() {
 
 function paginar(total) {
     const p = document.getElementById("paginacion");
+    if (!p) return;
     p.innerHTML = "";
     for (let i = 1; i <= Math.ceil(total / itemsPorPagina); i++) {
         const li = document.createElement("li");
@@ -281,14 +395,13 @@ function paginar(total) {
     }
 }
 
-document.getElementById("filtroEstado").onchange = mostrarFacturasBuscadas;
+const filtroEstado = document.getElementById("filtroEstado");
+if (filtroEstado) filtroEstado.onchange = mostrarFacturasBuscadas;
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/static/js/service-worker-carrito.js')
-            .then(() => console.log('SW registrado'))
-            .catch(console.error);
+        navigator.serviceWorker.register('/static/js/workers/service-worker-carrito.js')
+        .then(reg => { console.log('SW registrado'); })
+        .catch(error => { console.error('Error SW:', error); });
     });
 }
-
-cargarCarrito();

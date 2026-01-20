@@ -147,5 +147,13 @@ async function enviarFormulario(formData) {
 cargarPostres();
 
 if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => navigator.serviceWorker.register('/static/js/service-worker-gestion_productos.js').then(() => console.log('SW registrado')).catch(console.error));
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/static/js/workers/service-worker-gestion_productos.js')
+        .then(reg => {
+            console.log('SW registrado correctamente');
+        })
+        .catch(error => {
+            console.error('Error al registrar el SW:', error);
+        });
+    });
 }

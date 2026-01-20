@@ -1,81 +1,119 @@
 :root {
-    --primary-soft: #f8f9fa;
-    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --primary: #d35400;
+    --dark: #1a1a1a;
+    --bg-app: #f4f4f4;
+    --white: #ffffff;
+    --border-color: #dee2e6;
+    --transition-smooth: all 0.3s ease;
 }
 
-body { background-color: #f4f7f6; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+body {
+    background-color: var(--bg-app);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    color: var(--dark);
+}
 
-.fade-in { animation: fadeIn 0.5s ease; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-.card { border-radius: 12px; border: none; }
+.divider {
+    height: 4px;
+    width: 60px;
+    background: var(--primary);
+    border-radius: 2px;
+    margin-bottom: 20px;
+}
 
 .profile-img-container {
     position: relative;
-    width: 130px;
-    height: 130px;
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
 }
 
-.img-preview {
-    width: 100%;
-    height: 100%;
+#previewImagen {
+    width: 150px;
+    height: 150px;
     object-fit: cover;
-    border: 4px solid white;
-    transition: var(--transition-smooth);
+    border-radius: 50%;
+    border: 4px solid var(--white);
+    display: block;
 }
 
 .camera-btn {
     position: absolute;
-    bottom: 0;
-    right: 0;
-    background: #0d6efd;
-    color: white;
-    width: 35px;
-    height: 35px;
+    bottom: 5px;
+    right: 5px;
+    background: var(--white);
+    color: var(--primary);
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    border: 2px solid #ddd;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
     transition: var(--transition-smooth);
+    z-index: 5;
 }
 
-.camera-btn:hover { background: #0b5ed7; transform: scale(1.1); }
+.camera-btn:hover {
+    background: var(--primary);
+    color: var(--white);
+    transform: scale(1.1);
+    border-color: var(--primary);
+}
 
-.custom-input {
+.card {
+    border-radius: 15px;
+    background: var(--white);
+    border: 1px solid var(--border-color);
+}
+
+.custom-input, .form-select {
     border-radius: 8px;
-    padding: 0.6rem 1rem;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--border-color);
+    padding: 10px;
     transition: var(--transition-smooth);
 }
 
 .custom-input:focus {
-    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
-    border-color: #0d6efd;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(211, 84, 0, 0.1);
+    outline: none;
 }
-
-.bg-light-soft { background-color: #fcfcfc; }
-.shadow-inner { box-shadow: inset 0 2px 4px rgba(0,0,0,0.03); }
-
-.user-item {
-    transition: var(--transition-smooth);
-    border-left: 3px solid transparent;
-}
-
-.user-item:hover {
-    background-color: #f8f9fa;
-    border-left-color: #0d6efd;
-    transform: translateX(5px);
-}
-
-.is-valid-pass { border-color: #198754 !important; box-shadow: 0 0 0 0.25rem rgba(25, 135, 84, 0.25) !important; }
-.is-invalid-pass { border-color: #dc3545 !important; box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25) !important; }
 
 .btn-soft {
-    border-radius: 8px;
-    font-weight: 500;
+    border-radius: 50px;
+    padding: 10px 30px;
+    font-weight: 600;
     transition: var(--transition-smooth);
 }
 
-.btn-soft:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+.btn-primary.btn-soft {
+    background-color: var(--primary);
+    border: none;
+}
+
+.auth-badge {
+    font-size: 0.9rem;
+    border: 1px solid #ddd;
+}
+
+.bg-google { background: white; color: #555; }
+.bg-local { background: var(--dark); color: white; }
+
+.fade-in {
+    animation: fadeIn 0.6s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+#seccionSeguridad {
+    border-radius: 12px;
+}
+
+.is-valid-pass { border-color: #28a745 !important; }
+.is-invalid-pass { border-color: #dc3545 !important; }

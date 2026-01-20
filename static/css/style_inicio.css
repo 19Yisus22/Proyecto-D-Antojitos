@@ -24,6 +24,53 @@ body::after {
     z-index: -1;
 }
 
+.navbar {
+    z-index: 4000 !important;
+    position: sticky;
+    top: 0;
+}
+
+#toastContainer {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 3000;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.custom-toast {
+    background: #ffffff;
+    color: #333;
+    border-radius: 12px;
+    padding: 12px 20px;
+    min-width: 300px;
+    max-width: 350px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    border-left: 5px solid #d6336c;
+    pointer-events: auto;
+    animation: slideIn 0.5s ease forwards;
+    transition: all 0.4s ease;
+}
+
+.publicidad-container, 
+.ads-overlay, 
+#notificacionPublicidad {
+    z-index: 1000 !important;
+    pointer-events: none;
+}
+
+.publicidad-container *, 
+.ads-overlay *, 
+#notificacionPublicidad * {
+    pointer-events: auto;
+}
+
 .container {
     flex: 1;
     padding: 2rem;
@@ -187,17 +234,6 @@ h3 {
     border-top: 1px solid rgba(255,255,255,0.2);
     padding-top: 10px;
     font-size: 0.9rem;
-}
-
-#toastContainer {
-    position: fixed;
-    top: 20px;
-    left: 20px;
-    z-index: 1055;
-}
-
-.toast {
-    animation: slideIn 0.5s ease forwards;
 }
 
 @keyframes fadeIn {

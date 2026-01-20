@@ -54,7 +54,12 @@
                 <a href="/comentarios_page" class="btn btn-outline-dark w-100">Comentarios / Sugerencias</a>
                 {% if not session.get('user') %}
                 <hr>
-                <a href="/login" class="btn btn-primary w-100">Iniciar Sesión / Google</a>
+                <a href="/login" class="btn btn-dark w-100 d-flex align-items-center justify-content-center gap-3 py-2">
+                    <img src="{{ url_for('static', filename='uploads/googlogo.ico') }}" alt="Google" style="width: 22px; height: 22px; filter: drop-shadow(0px 0px 1px white);">
+                    <span style="color: rgba(255,255,255,0.5);">Iniciar con Google</span>
+                    <i class="bi bi-envelope-fill" style="font-size: 1.3rem; color: white;"></i>
+                    <span style="color: rgba(255,255,255,0.5);">Iniciar con Correo</span>
+                </a>
                 {% endif %}
             </div>
         </div>

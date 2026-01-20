@@ -1,71 +1,127 @@
 .navbar {
-    background: linear-gradient(90deg, #fff8f0, #ffe6d1);
-    transition: background 0.5s ease, box-shadow 0.5s ease;
+    background: #ffffff;
+    padding: 0.8rem 0;
+    transition: all 0.4s ease;
+    z-index: 1040 !important;
+    box-shadow: 0 4px 20px rgba(219, 112, 147, 0.08);
 }
 
-.navbar .navbar-brand {
-    font-size: 1.6rem;
-    color: #d35400;
-    transition: transform 0.3s ease, color 0.3s ease;
+.nav-gap-custom {
+    gap: 2.5rem;
 }
 
-.navbar .navbar-brand img {
-    border-radius: 12px;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+.nav-icon-link {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    padding: 0.5rem !important;
+    color: #5a67d8 !important; 
+    color: #4a5568 !important;
+    min-width: 80px;
 }
 
-.navbar .navbar-brand:hover {
-    transform: scale(1.05);
-    color: #e67e22;
+.nav-icon-link i {
+    font-size: 1.5rem;
+    margin-bottom: 4px;
+    transition: all 0.3s ease;
 }
 
-.navbar .navbar-brand img:hover {
-    transform: scale(1.1);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+.nav-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    opacity: 0.8;
 }
 
-.navbar-nav .nav-link {
-    color: #d35400;
-    font-weight: 500;
-    margin-right: 0.5rem;
-    transition: color 0.3s ease, transform 0.3s ease;
+.nav-icon-link:hover {
+    color: #db7093 !important;
 }
 
-.navbar-nav .nav-link:hover {
-    color: #e67e22;
-    transform: translateY(-2px);
+.nav-icon-link:hover i {
+    transform: translateY(-3px);
 }
 
-.navbar-nav .dropdown-menu {
-    border-radius: 10px;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.1);
-    transition: transform 0.3s ease, opacity 0.3s ease;
+.cart-badge-overlap {
+    position: absolute;
+    top: 2px;
+    right: 15px;
+    background-color: #db7093;
+    color: white;
+    font-size: 0.7rem;
+    font-weight: 800;
+    min-width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #ffffff;
+    box-shadow: 0 2px 5px rgba(219, 112, 147, 0.3);
 }
 
-.navbar-nav .dropdown-menu .dropdown-item {
-    transition: background 0.3s ease, color 0.3s ease;
+.profile-trigger {
+    padding: 0.5rem 1rem !important;
+    background: #fff0f5;
+    border-radius: 50px;
+    transition: background 0.3s ease;
 }
 
-.navbar-nav .dropdown-menu .dropdown-item:hover {
-    background: #ffe0c0;
-    color: #d35400;
+.profile-trigger:hover {
+    background: #ffe4ef;
 }
 
-.navbar-toggler {
-    border: none;
-    outline: none;
-    transition: transform 0.3s ease;
+.profile-img-container {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 2px solid #ffffff;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
-.navbar-toggler:hover {
-    transform: rotate(90deg);
+.profile-img-container img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
-.animate__fadeIn {
-    animation: fadeInDropdown 0.4s ease forwards;
+.profile-name {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #2d3748;
+    line-height: 1;
 }
 
-@keyframes fadeInDropdown {
-    from { opacity: 0; transform: translateY(-5px); }
+.profile-status {
+    font-size: 0.65rem;
+    color: #48bb78;
+    font-weight: 600;
+}
+
+.animate-dropdown {
+    animation: navSlide 0.3s ease-out;
+    margin-top: 15px !important;
+}
+
+@keyframes navSlide {
+    from { opacity: 0; transform: translateY(15px); }
     to { opacity: 1; transform: translateY(0); }
+}
+
+.dropdown-header {
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: #db7093 !important;
+    letter-spacing: 1px;
+}
+
+.publicidad-container, .custom-toast, #toastContainer {
+    z-index: 2000 !important;
+}
+
+@media (max-width: 991px) {
+    .nav-gap-custom { gap: 1rem; margin-top: 1rem; }
+    .nav-icon-link { flex-direction: row !important; min-width: auto; gap: 10px; }
+    .profile-trigger { border-radius: 10px; margin-top: 10px; }
 }

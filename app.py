@@ -9,30 +9,24 @@ from google.auth.transport import requests as google_requests
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 import os, uuid, socket, secrets, logging, hashlib, websockets, cloudinary, cloudinary.uploader, json
 
-# RUTAS Y DIRECTORIOS
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 UPLOAD_DIR = os.path.join(STATIC_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# VARIABLES DE ENTORNO
 env_path = os.path.join(BASE_DIR, ".env")
 if os.path.exists(env_path):
     load_dotenv(env_path)
 
-# CONEXION A SUPABASE
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY") or "TU_KEY_POR_DEFECTO"
 
 if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
     raise ValueError("Faltan las credenciales de Supabase en el archivo .env")
 
-supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
 supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-# CONEXION A CLOUDINARY
 CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME")
 CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY")
 CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET")
@@ -40,9 +34,13 @@ CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 
 if not CLOUDINARY_CLOUD_NAME or not CLOUDINARY_API_KEY or not CLOUDINARY_API_SECRET:
     raise ValueError("Faltan las credenciales de Cloudinary en el archivo .env")
-cloudinary.config( cloud_name=CLOUDINARY_CLOUD_NAME, api_key=CLOUDINARY_API_KEY, api_secret=CLOUDINARY_API_SECRET)
 
-# CONFIGURACION DE FLASK
+cloudinary.config(
+    cloud_name=CLOUDINARY_CLOUD_NAME, 
+    api_key=CLOUDINARY_API_KEY, 
+    api_secret=CLOUDINARY_API_SECRET
+)
+
 FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY") or secrets.token_hex(24)
 app = Flask(__name__, template_folder=TEMPLATES_DIR, static_folder=STATIC_DIR)
 app.permanent_session_lifetime = timedelta(days=7)
@@ -418,24 +416,30 @@ def cambiar_contrasena():
     supabase.table("usuarios").update({"contrasena": hashed}).eq("id_cliente", user_id).execute()
     return jsonify({"ok": True})
 
-@app.route("/eliminar_usuario_por_correo", methods=["DELETE"])
-def eliminar_usuario_por_correo():
+@app.route("/eliminar_usuario_admin", methods=["DELETE"])
+def eliminar_usuario_admin():
 
     data = request.get_json()
-    correo = data.get("correo","").strip().lower()
+    correo = data.get("correo", "").strip().lower()
 
     if not correo:
-        return jsonify({"ok": False,"error": "Correo requerido"}), 400
-    res_usuario = supabase.table("usuarios").select("*").eq("correo", correo).single().execute()
+        return jsonify({"ok": False, "error": "Correo requerido"}), 400
 
-    if not res_usuario.data:
-        return jsonify({"ok": False,"error": "Usuario no encontrado"}), 404
-    usuario = res_usuario.data
+    try:
+        
+        res_usuario = supabase.table("usuarios").select("*").eq("correo", correo).execute()
 
-    if usuario.get("imagen_url") and "default_icon_profile.png" not in usuario["imagen_url"]:
-        delete_image_from_cloudinary(usuario["imagen_url"])
-    supabase.table("usuarios").delete().eq("correo", correo).execute()
-    return jsonify({"ok": True})
+        if not res_usuario.data:
+            return jsonify({"ok": False, "error": "Usuario no encontrado"}), 404
+        usuario = res_usuario.data[0]
+
+        if usuario.get("imagen_url") and "default_icon_profile.png" not in usuario["imagen_url"]:
+            delete_image_from_cloudinary(usuario["imagen_url"])
+        supabase.table("usuarios").delete().eq("correo", correo).execute()
+        return jsonify({"ok": True})
+    
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 # APARTADO DE GESTION DE PRODUCTOS
@@ -773,17 +777,29 @@ def finalizar_compra():
 
     if not user_id:
         return jsonify({"message": "Debe iniciar sesión"}), 401
-    
     usuario_res = supabase.table("usuarios").select("nombre, apellido, cedula, direccion, metodo_pago, telefono, correo").eq("id_cliente", user_id).single().execute()
     usuario = usuario_res.data
 
-    if not usuario or not usuario.get("direccion"):
-        return jsonify({"message": "Usuario no tiene dirección registrada"}), 400
+    if not usuario:
+        return jsonify({"message": "Usuario no encontrado"}), 404
+    cedula_valor = str(usuario.get("cedula") or "").strip()
+    direccion_valor = str(usuario.get("direccion") or "").strip()
+    faltantes = []
+    
+    if not cedula_valor or cedula_valor.upper() == "N/A" or not cedula_valor.isdigit():
+        faltantes.append("Cédula numérica válida")
+        
+    if not direccion_valor or direccion_valor.upper() == "N/A":
+        faltantes.append("Dirección de entrega")
+
+    if faltantes:
+        msg = f"Datos requeridos: {' y '.join(faltantes)}"
+        return jsonify({"message": msg, "completar_perfil": True}), 400
     carrito_res = supabase.table("carrito").select("*").eq("id_cliente", user_id).execute()
     carrito = carrito_res.data or []
 
     if not carrito:
-        return jsonify({"message": "Carrito vacío"}), 400
+        return jsonify({"message": "El carrito está vacío"}), 400
     total_compra = 0
     detalles_carrito = []
 
@@ -798,10 +814,10 @@ def finalizar_compra():
             "nombre_producto": item.get("nombre_producto",""),
             "cantidad": cantidad,
             "precio_unitario": precio_unitario,
-            "subtotal": subtotal_item})
+            "subtotal": subtotal_item
+        })
         
     id_pedido = str(uuid.uuid4())
-
     supabase.table("pedidos").insert({
         "id_pedido": id_pedido,
         "id_cliente": user_id,
@@ -821,7 +837,7 @@ def finalizar_compra():
             "precio_unitario": det["precio_unitario"],
             "subtotal": det["subtotal"]}).execute()
         
-    factura_res = supabase.table("facturas").insert({
+    supabase.table("facturas").insert({
         "id_factura": str(uuid.uuid4()),
         "id_pedido": id_pedido,
         "id_cliente": user_id,
@@ -829,20 +845,9 @@ def finalizar_compra():
         "total": total_compra,
         "metodo_pago": usuario.get("metodo_pago","Efectivo"),
         "estado": "Emitida"}).execute()
-    
-    supabase.table("carrito").delete().eq("id_cliente", user_id).execute()
 
-    return jsonify({
-        "message": "Pedido enviado con éxito",
-        "total": total_compra,
-        "id_pedido": id_pedido,
-        "productos": detalles_carrito,
-        "metodo_pago": usuario.get("metodo_pago","Efectivo"),
-        "nombre_cliente": f"{usuario.get('nombre','')} {usuario.get('apellido','')}",
-        "cedula": usuario.get("cedula",""),
-        "telefono": usuario.get("telefono",""),
-        "correo": usuario.get("correo",""),
-        "direccion_entrega": usuario.get("direccion","")})
+    supabase.table("carrito").delete().eq("id_cliente", user_id).execute()
+    return jsonify({"message": "Pedido enviado con éxito", "ok": True})
 
 @app.route("/buscar_facturas", methods=["GET"])
 def buscar_facturas():
@@ -1095,7 +1100,6 @@ def comentarios_page():
 
     if not user_id:
         return redirect(url_for("login"))
-    
     res_usuario = supabase.table("usuarios").select("id_cliente,nombre,apellido,imagen_url").eq("id_cliente", user_id).single().execute()
     user = res_usuario.data
 
@@ -1144,7 +1148,6 @@ def crear_comentario():
 
     if "user_id" not in session:
         return jsonify({"error": "Usuario no autenticado"}), 401
-    
     data = request.get_json()
     mensaje = data.get("mensaje", "").strip()
 
@@ -1155,6 +1158,7 @@ def crear_comentario():
 
     if not user:
         return jsonify({"error": "Usuario no encontrado"}), 404
+    
     nuevo = supabase.table("comentarios").insert({
         "id_usuario": user["id_cliente"],
         "nombre_usuario": f"{user['nombre']} {user['apellido']}",
@@ -1168,7 +1172,6 @@ def editar_comentario(id):
 
     if "user_id" not in session:
         return jsonify({"error": "Usuario no autenticado"}), 401
-    
     data = request.get_json()
     mensaje = data.get("mensaje", "").strip()
 
@@ -1190,7 +1193,6 @@ def eliminar_comentario(id):
 
     if "user_id" not in session:
         return jsonify({"error": "Usuario no autenticado"}), 401
-    
     comentario_res = supabase.table("comentarios").select("*").eq("id", id).single().execute()
     comentario = comentario_res.data
 
@@ -1207,7 +1209,7 @@ def eliminar_comentario(id):
 
 @app.route("/publicidad_page", methods=["GET", "POST"])
 def publicidad_page():
-    
+
     if request.method == "POST":
         subtitulo = request.form.get("subtitulo", "").strip()
         carrusel_data = json.loads(request.form.get("metadata_carrusel", "[]"))
@@ -1217,9 +1219,12 @@ def publicidad_page():
 
         if res_actual.data:
             img_data = res_actual.data[0].get("img", {})
+
             if isinstance(img_data, str): img_data = json.loads(img_data)
+
             for c in img_data.get("carrusel", []): 
                 if c.get("url"): urls_viejas.append(c.get("url"))
+
             for s in img_data.get("secciones", []): 
                 if s.get("url"): urls_viejas.append(s.get("url"))
 
@@ -1244,6 +1249,7 @@ def publicidad_page():
         urls_nuevas = [c["url"] for c in carrusel_final if c.get("url")] + [s["url"] for s in secciones_final if s.get("url")]
         
         for url in urls_viejas:
+            
             if url and url not in urls_nuevas:
                 delete_image_from_cloudinary(url)
 
@@ -1252,9 +1258,8 @@ def publicidad_page():
             "subtitulo": subtitulo,
             "tipo": "general",
             "img": {"carrusel": carrusel_final, "secciones": secciones_final},
-            "estado": True
-        }
-
+            "estado": True}
+        
         resp = supabase.table("publicidad").select("id_publicidad").eq("tipo", "general").execute()
 
         if resp.data:
@@ -1276,25 +1281,19 @@ def obtener_publicidad_activa():
     if resp.data:
         pub = resp.data[0]
         imagenes = pub.get("img", {})
-
         if isinstance(imagenes, str): imagenes = json.loads(imagenes)
         return jsonify({
             "subtitulo": pub.get("subtitulo"),
             "metadata_carrusel": imagenes.get("carrusel", []),
-            "metadata_secciones": imagenes.get("secciones", [])
-        })
-    
+            "metadata_secciones": imagenes.get("secciones", [])})
     return jsonify({})
 
 @app.route("/api/admin/notificaciones", methods=["GET", "POST"])
 def admin_notificaciones():
 
-    user_id = session.get("user_id")
-
-    if not user_id:
-        return jsonify({"error": "Usuario no autenticado"}), 401
-    
     if request.method == "POST":
+
+        if not session.get("user_id"): return jsonify({"error": "No autorizado"}), 401
         titulo = request.form.get("titulo")
         descripcion = request.form.get("descripcion")
         archivo = request.files.get("archivo")
@@ -1314,9 +1313,8 @@ def admin_notificaciones():
     notificaciones = []
 
     for r in resp.data:
-
         imgs = r["img"]
-        
+
         if isinstance(imgs, str): imgs = json.loads(imgs)
         notificaciones.append({
             "id_notificacion": r["id_publicidad"],
@@ -1328,15 +1326,11 @@ def admin_notificaciones():
 @app.route("/api/admin/notificaciones/<id_notificacion>", methods=["PUT", "DELETE"])
 def admin_gestion_notificacion(id_notificacion):
 
-    user_id = session.get("user_id")
-
-    if not user_id:
-        return jsonify({"error": "Usuario no autenticado"}), 401
+    if not session.get("user_id"): return jsonify({"error": "No autorizado"}), 401
     res = supabase.table("publicidad").select("img").eq("id_publicidad", id_notificacion).execute()
     url_actual = ""
 
     if res.data:
-
         imgs = res.data[0]["img"]
 
         if isinstance(imgs, str): imgs = json.loads(imgs)
@@ -1354,7 +1348,6 @@ def admin_gestion_notificacion(id_notificacion):
         archivo = request.files.get("archivo")
 
         if archivo:
-            
             if url_actual: delete_image_from_cloudinary(url_actual)
             nueva_url = upload_image_to_cloudinary(archivo, folder="publicidad_DAntojitos")
             update_data["img"] = [nueva_url]
@@ -1364,17 +1357,13 @@ def admin_gestion_notificacion(id_notificacion):
 @app.route("/api/admin/publicidad/eliminar_img", methods=["POST"])
 def eliminar_imagen_suelta():
 
-    user_id = session.get("user_id")
-
-    if not user_id:
-        return jsonify({"error": "Usuario no autenticado"}), 401
+    if not session.get("user_id"): return jsonify({"error": "No autorizado"}), 401
     url = request.get_json().get("url")
     
     if url:
         delete_image_from_cloudinary(url)
         return jsonify({"ok": True})
     return jsonify({"ok": False}), 400
-
 
 # APARTADO DEL APP RUN
 
@@ -1399,7 +1388,7 @@ if __name__ == "__main__":
     port = 8000
     local_ip = get_local_ip()
 
-    debug_mode = True  # Cambia a True para modo debug  
+    debug_mode = False
 
     if debug_mode:
         print("⚡ Ejecutando en modo DEBUG con servidor de desarrollo de Flask")

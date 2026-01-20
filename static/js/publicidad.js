@@ -282,5 +282,13 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => navigator.serviceWorker.register('/static/js/service-worker-publicidad.js').then(() => console.log('SW registrado')).catch(console.error));
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/static/js/workers/service-worker-publicidad.js')
+        .then(reg => {
+            console.log('SW registrado correctamente');
+        })
+        .catch(error => {
+            console.error('Error al registrar el SW:', error);
+        });
+    });
 }
