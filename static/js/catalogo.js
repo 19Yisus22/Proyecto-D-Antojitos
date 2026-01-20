@@ -17,10 +17,10 @@ function playNotificationSound() {
     const gainNode = audioCtx.createGain();
 
     oscillator.type = 'sine';
-    oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // Nota La5
+    oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
     oscillator.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.1);
 
-    gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime); // Volumen muy suave
+    gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
     gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
 
     oscillator.connect(gainNode);
