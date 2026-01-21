@@ -284,9 +284,9 @@ async function cargarPedidos() {
           </table>
           <div class="mt-3">
             <select class="form-select estado-select" ${bloqueado ? 'disabled' : ''}>
-              <option value="Pendiente" ${pedido.estado === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
-              <option value="Entregado" ${pedido.estado === 'Entregado' ? 'selected' : ''}>Entregado</option>
-              <option value="Cancelado" ${pedido.estado === 'Cancelado' ? 'selected' : ''}>Anulado</option>
+              <option value="Pendiente" ${pedido.estado === 'Nuevo' ? 'selected' : ''}>Pendiente</option>
+              <option value="Entregado" ${pedido.estado === 'Pendiente' ? 'selected' : ''}>Entregado</option>
+              <option value="Cancelado" ${pedido.estado === 'Terminado' ? 'selected' : ''}>Anulado</option>
             </select>
             <button class="btn btn-primary btn-sm mt-2 actualizar-btn" ${bloqueado ? 'disabled' : ''}>Actualizar Estado</button>
           </div>
