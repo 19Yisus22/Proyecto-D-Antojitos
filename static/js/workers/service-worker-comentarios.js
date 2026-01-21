@@ -9,16 +9,20 @@ const assets = [
 ];
 
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(cacheName).then(cache => cache.addAll(assets))
-  );
   self.skipWaiting();
+  event.waitUntil(
+    caches.open(cacheName).then(cache => {
+      return cache.addAll(assets);
+    })
+  );
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys => {
-      return Promise.all(keys.filter(key => key !== cacheName).map(key => caches.delete(key)));
+      return Promise.all(
+        keys.filter(key => key !== cacheName).map(key => caches.delete(key))
+      );
     })
   );
   self.clients.claim();
@@ -27,26 +31,50 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
 
-  const url = event.request.url;
+  const requestUrl = new URL(event.request.url);
 
-  if (url.includes('/comentarios')) {
+  if (requestUrl.pathname === '/comentarios_page' || assets.includes(requestUrl.pathname)) {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match(event.request))
-    );
-  } else {
-    event.respondWith(
-      caches.match(event.request).then(response => {
-        return response || fetch(event.request).then(fetchRes => {
-          if (!fetchRes || fetchRes.status !== 200 || fetchRes.type !== 'basic') {
-            return fetchRes;
+      caches.match(event.request).then(cachedResponse => {
+        const fetchPromise = fetch(event.request).then(networkResponse => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseToCache = networkResponse.clone();
+            caches.open(cacheName).then(cache => {
+              cache.put(event.request, responseToCache);
+            });
           }
-          const responseToCache = fetchRes.clone();
-          caches.open(cacheName).then(cache => {
-            cache.put(event.request, responseToCache);
-          });
-          return fetchRes;
-        }).catch(() => {});
+          return networkResponse;
+        }).catch(() => {
+          return cachedResponse;
+        });
+
+        return cachedResponse || fetchPromise;
       })
     );
+    return;
   }
+
+  event.respondWith(
+    fetch(event.request)
+      .then(networkResponse => {
+        if (!networkResponse || networkResponse.status !== 200) {
+          return networkResponse;
+        }
+        const responseToCache = networkResponse.clone();
+        caches.open(cacheName).then(cache => {
+          cache.put(event.request, responseToCache);
+        });
+        return networkResponse;
+      })
+      .catch(() => {
+        return caches.match(event.request).then(fallbackResponse => {
+          if (fallbackResponse) {
+            return fallbackResponse;
+          }
+          if (event.request.mode === 'navigate') {
+            return caches.match('/comentarios_page');
+          }
+        });
+      })
+  );
 });

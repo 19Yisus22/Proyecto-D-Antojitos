@@ -10,37 +10,14 @@ const assets = [
 ];
 
 self.addEventListener('install', event => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(cacheName).then(cache => {
       return Promise.allSettled(
-        assets.map(url => {
-          return cache.add(url).catch(err => console.warn('No se pudo cachear:', url));
-        })
+        assets.map(url => cache.add(url))
       );
     })
   );
-});
-
-self.addEventListener('fetch', event => {
-  const url = new URL(event.request.url);
-
-  if (event.request.destination === 'image') {
-    event.respondWith(
-      fetch(event.request)
-        .then(response => {
-          const clonaRes = response.clone();
-          caches.open(cacheName).then(cache => cache.put(event.request, clonaRes));
-          return response;
-        })
-        .catch(() => caches.match(event.request))
-    );
-  } else {
-    event.respondWith(
-      caches.match(event.request).then(response => {
-        return response || fetch(event.request);
-      })
-    );
-  }
 });
 
 self.addEventListener('activate', event => {
@@ -51,4 +28,40 @@ self.addEventListener('activate', event => {
       );
     })
   );
+});
+
+self.addEventListener('fetch', event => {
+  if (event.request.method !== 'GET') return;
+
+  const isNavigation = event.request.mode === 'navigate' || event.request.url.includes('/mi_perfil');
+  const isImage = event.request.destination === 'image';
+
+  if (isNavigation || isImage) {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          const clonaRes = response.clone();
+          caches.open(cacheName).then(cache => cache.put(event.request, clonaRes));
+          return response;
+        })
+        .catch(() => {
+          return caches.match(event.request).then(res => {
+            return res || (isNavigation ? caches.match('/mi_perfil') : null);
+          });
+        })
+    );
+  } else {
+    event.respondWith(
+      caches.match(event.request).then(response => {
+        return response || fetch(event.request).then(fetchRes => {
+          return caches.open(cacheName).then(cache => {
+            if (event.request.url.includes('/static/')) {
+              cache.put(event.request, fetchRes.clone());
+            }
+            return fetchRes;
+          });
+        });
+      })
+    );
+  }
 });

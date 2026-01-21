@@ -42,14 +42,18 @@ self.addEventListener('fetch', event => {
     const url = new URL(event.request.url);
 
     if (EXCLUDED_PATHS.some(path => url.pathname.includes(path))) {
-        event.respondWith(fetch(event.request));
+        event.respondWith(fetch(event.request).catch(() => {
+            return new Response(JSON.stringify({ error: "Sin conexión" }), {
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }));
         return;
     }
 
     event.respondWith(
         caches.match(event.request).then(cachedResponse => {
             const fetchPromise = fetch(event.request).then(networkResponse => {
-                if (networkResponse && networkResponse.status === 200) {
+                if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
                     const responseToCache = networkResponse.clone();
                     caches.open(CACHE_NAME).then(cache => {
                         cache.put(event.request, responseToCache);
@@ -58,8 +62,9 @@ self.addEventListener('fetch', event => {
                 return networkResponse;
             }).catch(() => {
                 if (event.request.mode === 'navigate') {
-                    return caches.match('/catalogo_page');
+                    return caches.match('/catalogo_page') || caches.match('/');
                 }
+                return cachedResponse;
             });
 
             return cachedResponse || fetchPromise;

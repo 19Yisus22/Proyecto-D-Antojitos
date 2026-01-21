@@ -1,6 +1,7 @@
 let facturasActuales = [];
 let paginaActual = 1;
 const itemsPorPagina = 5;
+let productosCarrito = [];
 
 function showMessage(msg, isError = false) {
     const container = document.getElementById('toastContainer');
@@ -20,6 +21,120 @@ function showMessage(msg, isError = false) {
     };
     toast.querySelector('.btn-close-toast').onclick = remove;
     setTimeout(remove, 3500);
+}
+
+function playNotificationSound() {
+    try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+        const audioCtx = new AudioContextClass();
+        if (audioCtx.state === 'suspended') return;
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.1);
+        gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + 0.2);
+    } catch (e) {}
+}
+
+function mostrarToastPublicidad(imagen, titulo, descripcion, isError = false) {
+    const cont = document.getElementById("toastContainer");
+    if (!cont) return;
+    playNotificationSound();
+    const t = document.createElement("div");
+    t.className = "toast show bg-dark text-white border-light mb-2";
+    t.style.display = "block";
+    t.style.minWidth = "320px";
+    const textColor = isError ? '#dc3545' : '#198754';
+    const iconClass = isError ? 'bi-x-circle-fill' : 'bi-check-circle-fill';
+    t.innerHTML = `
+        <div class="d-flex align-items-center p-2">
+            <img src="${imagen}" style="width:55px;height:55px;object-fit:cover;border-radius:8px;" class="me-3 shadow-sm">
+            <div class="flex-grow-1">
+                <div class="d-flex align-items-center mb-1">
+                    <i class="bi ${iconClass} me-2" style="color: ${textColor};"></i>
+                    <strong style="color: ${textColor};" class="mb-0">${titulo}</strong>
+                </div>
+                <small class="text-white-50">${descripcion}</small>
+            </div>
+            <button class="btn-close btn-close-white ms-2" style="font-size: 0.7rem;"></button>
+        </div>`;
+    cont.appendChild(t);
+    const remove = () => {
+        t.style.opacity = '0';
+        t.style.transition = 'opacity 0.5s ease';
+        setTimeout(() => t.remove(), 500);
+    };
+    t.querySelector('.btn-close').onclick = remove;
+    setTimeout(remove, 4000);
+}
+
+async function verificarStockCarrito() {
+    try {
+        const resCarrito = await fetch("/obtener_carrito");
+        if (!resCarrito.ok) return;
+        const miCarrito = await resCarrito.json();
+        
+        const resCatalogo = await fetch("/obtener_catalogo");
+        if (!resCatalogo.ok) return;
+        const catalogo = await resCatalogo.json();
+
+        if (miCarrito.productos && miCarrito.productos.length > 0) {
+            miCarrito.productos.forEach(itemCarrito => {
+                const productoReal = catalogo.productos.find(p => p.id_producto == itemCarrito.id_producto);
+                
+                if (productoReal) {
+                    const itemAnterior = productosCarrito.find(p => p.id_producto == itemCarrito.id_producto);
+                    
+                    if (itemAnterior) {
+                        if (itemAnterior.stock_disponible > 0 && productoReal.stock <= 0) {
+                            mostrarToastPublicidad(
+                                itemCarrito.imagen || itemCarrito.imagen_url || '/static/uploads/default.png',
+                                "Producto Agotado",
+                                `${itemCarrito.nombre_producto} ya no está disponible`,
+                                true
+                            );
+                        } else if (itemAnterior.stock_disponible <= 0 && productoReal.stock > 0) {
+                            mostrarToastPublicidad(
+                                itemCarrito.imagen || itemCarrito.imagen_url || '/static/uploads/default.png',
+                                "Producto Disponible",
+                                `${itemCarrito.nombre_producto} vuelve a estar disponible`
+                            );
+                        } else if (itemAnterior.stock_disponible > productoReal.stock && productoReal.stock > 0) {
+                            mostrarToastPublicidad(
+                                itemCarrito.imagen || itemCarrito.imagen_url || '/static/uploads/default.png',
+                                "Stock Reducido",
+                                `${itemCarrito.nombre_producto} ahora tiene ${productoReal.stock} unidades`,
+                                true
+                            );
+                        }
+                    }
+                    
+                    const index = productosCarrito.findIndex(p => p.id_producto == itemCarrito.id_producto);
+                    if (index !== -1) {
+                        productosCarrito[index].stock_disponible = productoReal.stock;
+                    } else {
+                        productosCarrito.push({
+                            id_producto: itemCarrito.id_producto,
+                            stock_disponible: productoReal.stock
+                        });
+                    }
+                }
+            });
+
+            productosCarrito = productosCarrito.filter(p => 
+                miCarrito.productos.some(c => c.id_producto == p.id_producto)
+            );
+        }
+    } catch (e) {
+        console.error("Error verificando stock:", e);
+    }
 }
 
 async function descargarPDF(f) {
@@ -218,6 +333,8 @@ document.addEventListener('DOMContentLoaded', () => {
         actualizarContadorBadge(savedCount);
     }
     cargarCarrito();
+    
+    setInterval(verificarStockCarrito, 3000);
 });
 
 async function finalizarCompra() {
@@ -225,31 +342,9 @@ async function finalizarCompra() {
     if (!btn) return;
     const originalText = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Validando Stock...`;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Procesando...`;
 
     try {
-        const checkRes = await fetch("/obtener_catalogo");
-        const catalogo = await checkRes.json();
-        const resCarrito = await fetch("/obtener_carrito");
-        const miCarrito = await resCarrito.json();
-
-        let stockInsuficiente = false;
-        miCarrito.productos.forEach(item => {
-            const pReal = catalogo.productos.find(p => p.id_producto == item.id_producto);
-            if (pReal && item.cantidad > pReal.stock) {
-                stockInsuficiente = true;
-                showMessage(`Stock insuficiente para ${item.nombre_producto}. Disponible: ${pReal.stock}`, true);
-            }
-        });
-
-        if (stockInsuficiente) {
-            btn.disabled = false;
-            btn.innerHTML = originalText;
-            await cargarCarrito();
-            return;
-        }
-
-        btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Procesando...`;
         const res = await fetch("/finalizar_compra", { 
             method: "POST",
             headers: { "Content-Type": "application/json" }
@@ -260,6 +355,11 @@ async function finalizarCompra() {
             if (res.status === 400 && data.completar_perfil) {
                 showMessage(data.message, true);
                 setTimeout(() => { window.location.href = "/mi_perfil"; }, 1000);
+            } else if (res.status === 400 && data.stock_insuficiente) {
+                showMessage(data.message, true);
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+                await cargarCarrito();
             } else {
                 showMessage(data.message || "Error al procesar el pedido", true);
                 btn.disabled = false;
@@ -270,6 +370,7 @@ async function finalizarCompra() {
 
         showMessage("¡Pedido enviado con éxito!");
         actualizarContadorBadge(0);
+        productosCarrito = [];
         await cargarCarrito();
         
     } catch (error) {

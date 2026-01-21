@@ -9,6 +9,7 @@ const STATIC_FILES = [
 ];
 
 self.addEventListener('install', (e) => {
+    self.skipWaiting();
     e.waitUntil(
         caches.open(CACHE_NAME).then((cache) => {
             return cache.addAll(STATIC_FILES);
@@ -29,7 +30,12 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
-    if (e.request.url.includes('/api/')) {
+    if (e.request.method !== 'GET') return;
+
+    const isNavigation = e.request.mode === 'navigate' || e.request.url.includes('/publicidad_page');
+    const isApi = e.request.url.includes('/api/');
+
+    if (isNavigation || isApi) {
         e.respondWith(
             fetch(e.request)
                 .then((res) => {
@@ -37,13 +43,16 @@ self.addEventListener('fetch', (e) => {
                     caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
                     return res;
                 })
-                .catch(() => caches.match(e.request))
+                .catch(() => caches.match(e.request).then((cached) => {
+                    return cached || (isNavigation ? caches.match('/publicidad_page') : null);
+                }))
         );
     } else {
         e.respondWith(
             caches.match(e.request).then((res) => {
                 return res || fetch(e.request).then((fetchRes) => {
-                    if (e.request.url.includes('/uploads/')) {
+                    const isResource = e.request.url.includes('/uploads/') || e.request.url.includes('/static/');
+                    if (isResource) {
                         const clone = fetchRes.clone();
                         caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
                     }

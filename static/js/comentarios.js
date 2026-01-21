@@ -3,6 +3,7 @@ const sendBtn = document.getElementById("sendBtn");
 const mensajeInput = document.getElementById("mensajeInput");
 const toastContainer = document.getElementById('toastContainer');
 let editandoComentario = null;
+let comentariosActuales = []; 
 const usuario = {id_usuario: window.userId};
 
 function showMessage(msg, isError = false) {
@@ -26,47 +27,98 @@ function showMessage(msg, isError = false) {
 
 function renderComentario(c) {
     const div = document.createElement("div");
-    div.className = "message";
+    div.className = "message position-relative shadow-sm border rounded-4 p-3 mb-3 bg-white";
     div.id = `msg-${c.id}`;
+    
     const foto = c.usuario_info?.foto_perfil || 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
     const nombre = c.usuario_info?.nombre_usuario || 'Usuario';
     const fecha = new Date(c.created_at).toLocaleString('es-CO', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+    
+    const esMiPropioComentario = c.id_usuario === usuario.id_usuario;
+    const estaConectado = c.usuario_info?.conectado === true || esMiPropioComentario;
+    const claseEstado = estaConectado ? 'estado-conectado' : 'estado-desconectado';
 
     div.innerHTML = `
-        <div class="d-flex align-items-start position-relative">
-            <img src="${foto}" class="rounded-circle me-3 foto-click" width="45" height="45" style="object-fit:cover; cursor:pointer;">
+        <div class="d-flex align-items-start">
+            <div class="contenedor-foto-estado me-3">
+                <img src="${foto}" class="rounded-circle foto-click border" width="50" height="50" style="object-fit:cover; cursor:pointer;">
+                <span class="punto-estado status-dot-${c.id_usuario} ${claseEstado}"></span>
+            </div>
             <div class="flex-grow-1">
                 <div class="d-flex justify-content-between align-items-center mb-1">
-                    <span class="fw-bold text-primary" style="font-size:0.9rem;">${nombre}</span>
-                    <span class="text-muted" style="font-size:0.75rem;">${fecha}</span>
+                    <span class="fw-bold text-primary" style="font-size:0.95rem;">${nombre}</span>
+                    <div class="d-flex align-items-center">
+                        <span class="text-muted small me-2">${fecha}</span>
+                        ${esMiPropioComentario ? `
+                            <div class="dropdown">
+                                <i class="bi bi-three-dots-vertical btn-options text-muted" style="cursor:pointer; font-size: 1.2rem;"></i>
+                            </div>
+                        ` : ''}
+                    </div>
                 </div>
-                <div class="mensaje-texto">${c.mensaje}</div>
+                <div class="mensaje-texto text-dark" style="font-size: 0.9rem; line-height: 1.4;">${c.mensaje}</div>
             </div>
-            ${c.id_usuario === usuario.id_usuario ? `<i class="bi bi-three-dots-vertical ms-2 btn-options" style="cursor:pointer;"></i>` : ''}
         </div>
     `;
 
-    if(c.id_usuario === usuario.id_usuario) {
+    if(esMiPropioComentario) {
         div.querySelector(".btn-options").onclick = (e) => {
             e.stopPropagation();
             document.querySelectorAll(".comentario-dropdown").forEach(d => d.remove());
+            
             const dd = document.createElement("ul");
-            dd.className = "list-group position-absolute shadow comentario-dropdown";
+            dd.className = "list-group position-absolute shadow-lg comentario-dropdown";
+            dd.style.zIndex = "2000";
+            
             dd.innerHTML = `
-                <li class="list-group-item py-2" style="cursor:pointer;"><i class="bi bi-pencil me-2"></i>Editar</li>
-                <li class="list-group-item py-2 text-danger" style="cursor:pointer;"><i class="bi bi-trash me-2"></i>Eliminar</li>
+                <li class="list-group-item list-group-item-action border-0 py-2 px-3" style="cursor:pointer; font-size: 0.9rem;">
+                    <i class="bi bi-pencil me-2 text-primary"></i>Editar
+                </li>
+                <li class="list-group-item list-group-item-action border-0 py-2 px-3 text-danger" style="cursor:pointer; font-size: 0.9rem;">
+                    <i class="bi bi-trash me-2"></i>Eliminar
+                </li>
             `;
-            const r = e.target.getBoundingClientRect();
-            dd.style.top = `${r.bottom + window.scrollY}px`;
-            dd.style.left = `${r.left + window.scrollX - 100}px`;
-            dd.style.position = "absolute";
-            dd.querySelectorAll("li")[0].onclick = () => iniciarEdicion(c.id, c.mensaje);
-            dd.querySelectorAll("li")[1].onclick = () => ejecutarEliminacionDirecta(c.id);
+            
+            const rect = e.target.getBoundingClientRect();
+            dd.style.position = "fixed";
+            dd.style.top = `${rect.bottom + 5}px`;
+            dd.style.left = `${rect.left - 100}px`;
+            
+            dd.querySelectorAll("li")[0].onclick = () => {
+                iniciarEdicion(c.id, c.mensaje);
+                dd.remove();
+            };
+            
+            dd.querySelectorAll("li")[1].onclick = () => {
+                ejecutarEliminacionDirecta(c.id);
+                dd.remove();
+            };
+            
             document.body.appendChild(dd);
             document.addEventListener("click", () => dd.remove(), {once:true});
         };
     }
     return div;
+}
+
+async function cargarComentarios() {
+    try {
+        const res = await fetch("/comentarios");
+        if(!res.ok) return;
+        const nuevosComentarios = await res.json();
+        
+        const stringNuevo = JSON.stringify(nuevosComentarios);
+        const stringViejo = JSON.stringify(comentariosActuales);
+
+        if (stringNuevo !== stringViejo) {
+            comentariosActuales = nuevosComentarios;
+            chatBox.innerHTML = "";
+            comentariosActuales.forEach(c => chatBox.appendChild(renderComentario(c)));
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    } catch(e) { 
+        console.error("Error al sincronizar comentarios:", e); 
+    }
 }
 
 async function ejecutarEliminacionDirecta(id) {
@@ -75,7 +127,6 @@ async function ejecutarEliminacionDirecta(id) {
         el.style.opacity = '0.5';
         el.style.pointerEvents = 'none';
     }
-
     try {
         const res = await fetch(`/comentarios/${id}`, {method:"DELETE"});
         if(res.ok) {
@@ -85,6 +136,7 @@ async function ejecutarEliminacionDirecta(id) {
                 setTimeout(() => {
                     el.remove();
                     showMessage("Comentario eliminado correctamente");
+                    cargarComentarios();
                 }, 300);
             }
         } else {
@@ -97,17 +149,6 @@ async function ejecutarEliminacionDirecta(id) {
     }
 }
 
-async function cargarComentarios() {
-    try {
-        const res = await fetch("/comentarios");
-        if(!res.ok) return;
-        const data = await res.json();
-        chatBox.innerHTML = "";
-        data.forEach(c => chatBox.appendChild(renderComentario(c)));
-        chatBox.scrollTop = chatBox.scrollHeight;
-    } catch(e) { console.error(e); }
-}
-
 function iniciarEdicion(id, msg) {
     mensajeInput.value = msg;
     editandoComentario = id;
@@ -118,11 +159,9 @@ function iniciarEdicion(id, msg) {
 sendBtn.onclick = async () => {
     const mensaje = mensajeInput.value.trim();
     if(!mensaje) return;
-
     const originalContent = sendBtn.innerHTML;
     sendBtn.disabled = true;
     sendBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>${editandoComentario ? 'Guardando...' : 'Enviando...'}`;
-
     try {
         let res, url = "/comentarios", method = "POST";
         if(editandoComentario) {
@@ -152,11 +191,14 @@ sendBtn.onclick = async () => {
     }
 };
 
-cargarComentarios();
+window.onload = () => {
+    cargarComentarios();
+    setInterval(cargarComentarios, 3000);
+};
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/static/js/workers/service-worker-comentarios.js')
+        navigator.serviceWorker.register('/static/js/workers/service-worker-catalogo.js')
         .then(reg => {
             console.log('SW registrado correctamente');
         })

@@ -2,9 +2,9 @@ import requests
 from waitress import serve
 from flask_cors import CORS
 from dotenv import load_dotenv
-from datetime import timedelta
 from supabase import create_client
 from google.oauth2 import id_token
+from datetime import datetime, timezone, timedelta
 from google.auth.transport import requests as google_requests
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 import os, uuid, socket, secrets, logging, hashlib, websockets, cloudinary, cloudinary.uploader, json
@@ -24,7 +24,6 @@ SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 
 if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
     raise ValueError("Faltan las credenciales de Supabase en el archivo .env")
-
 supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME")
@@ -34,12 +33,7 @@ CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 
 if not CLOUDINARY_CLOUD_NAME or not CLOUDINARY_API_KEY or not CLOUDINARY_API_SECRET:
     raise ValueError("Faltan las credenciales de Cloudinary en el archivo .env")
-
-cloudinary.config(
-    cloud_name=CLOUDINARY_CLOUD_NAME, 
-    api_key=CLOUDINARY_API_KEY, 
-    api_secret=CLOUDINARY_API_SECRET
-)
+cloudinary.config(cloud_name=CLOUDINARY_CLOUD_NAME, api_key=CLOUDINARY_API_KEY, api_secret=CLOUDINARY_API_SECRET)
 
 FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY") or secrets.token_hex(24)
 app = Flask(__name__, template_folder=TEMPLATES_DIR, static_folder=STATIC_DIR)
@@ -1121,27 +1115,48 @@ def comentarios_page():
 @app.route("/comentarios", methods=["GET"])
 def obtener_comentarios():
 
-    comentarios_res = supabase.table("comentarios").select("*").order("created_at", desc=False).execute()
-    comentarios = comentarios_res.data or []
-    usuarios_res = supabase.table("usuarios").select("id_cliente,nombre,apellido,imagen_url,telefono,correo").execute()
-    usuarios_dict = {
-        u["id_cliente"]: {
-            "nombre_usuario": f"{u['nombre']} {u['apellido']}".strip(),
-            "foto_perfil": u.get("imagen_url"),
-            "telefono": u.get("telefono"),
-            "correo": u.get("correo")
-        }
+    try:
+        comentarios_res = supabase.table("comentarios").select("*").order("created_at", desc=False).execute()
+        comentarios = comentarios_res.data or []
+        usuarios_res = supabase.table("usuarios").select("id_cliente,nombre,apellido,imagen_url,ultima_conexion").execute()
+        usuarios_data = usuarios_res.data or []
+        ahora = datetime.now(timezone.utc)
+        usuarios_dict = {}
+        
+        for u in usuarios_data:
+            esta_conectado = False
+            ultima_con = u.get("ultima_conexion")
+            
+            if ultima_con:
+                try:
+                    fecha_con = datetime.fromisoformat(ultima_con.replace('Z', '+00:00'))
+                    
+                    if (ahora - fecha_con).total_seconds() < 60:
+                        esta_conectado = True
+                except Exception:
+                    esta_conectado = False
 
-        for u in usuarios_res.data
+            usuarios_dict[u["id_cliente"]] = {
+                "nombre_usuario": f"{u['nombre']} {u['apellido']}".strip(),
+                "foto_perfil": u.get("imagen_url"),
+                "conectado": esta_conectado}
 
-    } if usuarios_res.data else {}
+        for c in comentarios:
+            info = usuarios_dict.get(c["id_usuario"], {
+                "nombre_usuario": "Usuario", 
+                "foto_perfil": None, 
+                "conectado": False})
+            
+            c["usuario_info"] = info
+            
+            if not c.get("foto_perfil"):
+                c["foto_perfil"] = info["foto_perfil"]
 
-    for c in comentarios:
-        info = usuarios_dict.get(c["id_usuario"], {"nombre_usuario": "Usuario", "foto_perfil": None, "telefono": None, "correo": None})
-        c["usuario_info"] = info
-        if not c.get("foto_perfil"):
-            c["foto_perfil"] = info["foto_perfil"]
-    return jsonify(comentarios)
+        return jsonify(comentarios)
+
+    except Exception as e:
+        print(f"Error en endpoint comentarios: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/comentarios", methods=["POST"])
 def crear_comentario():
@@ -1203,6 +1218,23 @@ def eliminar_comentario(id):
         return jsonify({"error": "No puedes eliminar este comentario"}), 403
     supabase.table("comentarios").delete().eq("id", id).execute()
     return jsonify({"ok": True})
+
+@app.route("/actualizar_estado_comentarios", methods=["POST"])
+def actualizar_estado_comentarios():
+
+    try:
+
+        user_id = session.get("user_id")
+
+        if user_id:
+            ahora = datetime.now(timezone.utc).isoformat()
+            supabase.table("usuarios").update({"ultima_conexion": ahora}).eq("id_cliente", user_id).execute()
+            return jsonify({"status": "ok"}), 200
+        return jsonify({"status": "no_auth"}), 401
+    
+    except Exception as e:
+        print(f"Error en actualizar_estado_comentarios: {e}")
+        return jsonify({"error": "server_error"}), 500
 
 
 # APARTADO DE SISTEMA DE PUBLICIDAD
@@ -1384,11 +1416,12 @@ def redirect_root():
         return redirect("/inicio")
 
 if __name__ == "__main__":
+    
     host = "0.0.0.0"
     port = 8000
     local_ip = get_local_ip()
 
-    debug_mode = True
+    debug_mode = False
 
     if debug_mode:
         print("⚡ Ejecutando en modo DEBUG con servidor de desarrollo de Flask")
