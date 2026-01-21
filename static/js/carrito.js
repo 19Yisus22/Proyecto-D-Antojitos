@@ -94,7 +94,7 @@ async function descargarPDF(f) {
     doc.text(mensaje2, (210 - textWidth2) / 2, finalY + 38);
 
     doc.save(`Factura_${f.numero_factura}.pdf`);
-    showMessage("PDF generado y descargado correctamente");
+    showMessage("Descarga finalizada PDF");
 }
 
 async function cargarCarrito() {
@@ -364,7 +364,7 @@ function mostrarFacturasBuscadas() {
                 <div class="d-flex justify-content-between align-items-center">
                     <button class="btn btn-sm btn-link text-danger p-0 btn-anular fw-bold" ${f.estado==='Anulada'?'disabled':''} style="text-decoration:none;">Anular pedido</button>
                     <div class="text-end">
-                        <small class="text-muted d-block">Total pagado</small>
+                        <small class="text-muted d-block">Total a pagar</small>
                         <span class="fw-bold fs-5 text-primary">${total.toLocaleString('es-CO',{style:'currency',currency:'COP'})}</span>
                     </div>
                 </div>
@@ -401,7 +401,11 @@ if (filtroEstado) filtroEstado.onchange = mostrarFacturasBuscadas;
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/static/js/workers/service-worker-carrito.js')
-        .then(reg => { console.log('SW registrado'); })
-        .catch(error => { console.error('Error SW:', error); });
+        .then(reg => {
+            console.log('SW registrado correctamente');
+        })
+        .catch(error => {
+            console.error('Error al registrar el SW:', error);
+        });
     });
 }

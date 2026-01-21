@@ -20,9 +20,12 @@
   </div>
 
   <div class="d-flex gap-2 mb-3 flex-wrap">
-    <div class="input-group flex-grow-1">
-      <span class="input-group-text"><i class="bi bi-search"></i></span>
-      <input type="text" id="buscarCliente" class="form-control" placeholder="Buscar por nombre del cliente">
+    <div class="input-group" style="max-width: 400px;">
+      <span class="input-group-text fw-bold">F-</span>
+      <select id="selectAnio" class="form-select" style="max-width: 100px;">
+      </select>
+      <span class="input-group-text">-</span>
+      <input type="number" id="inputNumeroFactura" class="form-control" placeholder="Número" min="1">
     </div>
     <select id="filtroEstado" class="form-select w-auto">
       <option value="Todos">Todos los Estados</option>
@@ -30,6 +33,7 @@
       <option value="Entregado">Entregados</option>
       <option value="Cancelado">Cancelados</option>
       <option value="Terminados">Terminados</option>
+      <option value="HistorialAnulados">Historial Anulados</option>
     </select>
     <button id="eliminarSeleccionados" class="btn btn-danger fw-bold">
       <i class="bi bi-trash"></i> Borrar Seleccionados
@@ -62,7 +66,7 @@
 <script>setTimeout(() => { window.location.href = "{{ url_for('inicio') }}"; }, 3000);</script>
 {% endif %}
 
-<div id="toastContainer" class="position-fixed p-3 top-0 end-0" style="z-index: 1080;"></div>
+<div id="toastContainer"></div>
 
 <div id="alertaCancelado" class="d-none position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center bg-dark bg-opacity-75" style="z-index: 1090;">
   <div class="bg-white p-4 rounded shadow text-center">

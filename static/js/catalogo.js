@@ -100,18 +100,7 @@ function mostrarToastPublicidad(imagen, titulo, descripcion, isError = false) {
         setTimeout(() => t.remove(), 500);
     };
     t.querySelector('.btn-close').onclick = remove;
-    setTimeout(remove, 3000);
-}
-
-async function mostrarNotificacionAleatoria() {
-    try {
-        const res = await fetch("/api/admin/notificaciones");
-        const data = await res.json();
-        if (data && data.length > 0) {
-            const aleatorio = data[Math.floor(Math.random() * data.length)];
-            mostrarToastPublicidad(aleatorio.imagen_url, aleatorio.titulo, aleatorio.descripcion);
-        }
-    } catch (e) {}
+    setTimeout(remove, 2000);
 }
 
 async function sincronizarContadorCarrito() {
@@ -119,7 +108,9 @@ async function sincronizarContadorCarrito() {
         const res = await fetch("/obtener_carrito");
         const data = await res.json();
         if (data && data.productos) {
-            contadorCarrito = data.productos.reduce((total, item) => total + item.cantidad, 0);
+            const nuevoTotal = data.productos.reduce((total, item) => total + item.cantidad, 0);
+            
+            contadorCarrito = nuevoTotal;
             localStorage.setItem('cant_carrito', contadorCarrito);
             actualizarContadorCarrito(0);
         }
@@ -217,28 +208,45 @@ function agregarEventosProductos() {
                 showMessage("Inicie sesión primero para añadir productos", true);
                 return;
             }
+
+            const wrapper = btn.closest('[data-id]');
+            const id_producto = wrapper.dataset.id;
+            const cantidadInput = wrapper.querySelector(".cantidad");
+            const cantidadPedida = parseInt(cantidadInput.value);
+            
+            const productoArray = productos.find(p => p.id_producto == id_producto);
+
+            if (cantidadPedida > productoArray.stock) {
+                showMessage(`Stock insuficiente. Solo quedan ${productoArray.stock}`, true);
+                return;
+            }
+
             const originalContent = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>`;
-            const wrapper = btn.closest('[data-id]');
-            const id_producto = wrapper.dataset.id;
-            const productoArray = productos.find(p => p.id_producto == id_producto);
-            const cantidad = parseInt(wrapper.querySelector(".cantidad").value);
 
             try {
                 const res = await fetch("/guardar_catalogo", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ productos: [{ id_producto, cantidad }] })
+                    body: JSON.stringify({ productos: [{ id_producto, cantidad: cantidadPedida }] })
                 });
 
                 if (res.ok) {
-                    actualizarContadorCarrito(cantidad);
-                    productoArray.stock -= cantidad;
-                    showMessage("Producto añadido al carrito");
+                    productoArray.stock -= cantidadPedida;
+                    actualizarContadorCarrito(cantidadPedida);
+                    
+                    if (productoArray.stock <= 0) {
+                        mostrarToastPublicidad(productoArray.imagen_url || '/static/uploads/logo.png', "Producto Agotado", `El postre ${productoArray.nombre} se ha terminado.`, true);
+                    } else {
+                        showMessage("Producto añadido al carrito");
+                    }
+                    
                     renderProductos(searchInput.value);
                 } else {
-                    showMessage("No se pudo añadir el producto", true);
+                    const errorData = await res.json();
+                    showMessage(errorData.message || "No se pudo añadir el producto", true);
+                    await cargarProductos();
                 }
             } catch (error) {
                 showMessage("Error de conexión con el servidor", true);
@@ -255,8 +263,10 @@ function agregarEventosProductos() {
         btn.onclick = () => {
             const input = btn.parentElement.querySelector(".cantidad");
             const wrapper = btn.closest('[data-id]');
-            const stock = parseInt(wrapper.dataset.stock);
-            if (parseInt(input.value) < stock) {
+            const id_producto = wrapper.dataset.id;
+            const productoActual = productos.find(p => p.id_producto == id_producto);
+            
+            if (parseInt(input.value) < productoActual.stock) {
                 input.value = parseInt(input.value) + 1;
             } else {
                 showMessage("Límite de stock alcanzado", true);
@@ -276,11 +286,33 @@ async function cargarProductos() {
     try {
         const res = await fetch("/obtener_catalogo");
         const data = await res.json();
-        productos = data.productos || [];
-        const spinner = document.getElementById("spinner");
-        if (spinner) spinner.style.display = "none";
-        catalogoContainer.classList.remove("d-none");
-        renderProductos();
+        const nuevosProductos = data.productos || [];
+        let huboCambios = false;
+        
+        nuevosProductos.forEach(nuevo => {
+            const viejo = productos.find(p => p.id_producto == nuevo.id_producto);
+            if (viejo) {
+                if (viejo.stock > 0 && nuevo.stock <= 0) {
+                    mostrarToastPublicidad(nuevo.imagen_url || '/static/uploads/logo.png', "Producto Agotado", `Alguien acaba de llevarse el último ${nuevo.nombre}`, true);
+                    huboCambios = true;
+                }
+                else if (viejo.stock <= 0 && nuevo.stock > 0) {
+                    mostrarToastPublicidad(nuevo.imagen_url || '/static/uploads/logo.png', "Producto Disponible", `¡El postre ${nuevo.nombre} vuelve a estar disponible!`);
+                    huboCambios = true;
+                }
+                else if (viejo.stock !== nuevo.stock) {
+                    huboCambios = true;
+                }
+            }
+        });
+
+        if (huboCambios || productos.length === 0) {
+            productos = nuevosProductos;
+            const spinner = document.getElementById("spinner");
+            if (spinner) spinner.style.display = "none";
+            catalogoContainer.classList.remove("d-none");
+            renderProductos(searchInput.value);
+        }
     } catch (e) {
         showMessage("Error al cargar el catálogo", true);
     }
@@ -323,11 +355,13 @@ function resetBotonesEstado() {
 window.onload = () => {
     cargarProductos();
     resetBotonesEstado();
+    
+    setInterval(cargarProductos, 3000);
+
     if (userLogged && userLogged !== "false") {
         sincronizarContadorCarrito();
+        setInterval(sincronizarContadorCarrito, 5000);
     }
-    setTimeout(mostrarNotificacionAleatoria, 1000);
-    setInterval(mostrarNotificacionAleatoria, 30000);
 };
 
 window.onpageshow = (event) => {
@@ -337,7 +371,37 @@ window.onpageshow = (event) => {
         contadorCarrito = parseInt(guardado);
         actualizarContadorCarrito(0);
     }
+    cargarProductos();
 };
+
+async function mostrarNotificacionAleatoria(){
+    try {
+        const res = await fetch("/api/admin/notificaciones");
+        if(res.status === 401) return;
+        const data = await res.json();
+        if(data && data.length > 0) {
+            const aleatorio = data[Math.floor(Math.random()*data.length)];
+            mostrarToastPublicidad(aleatorio.imagen_url, aleatorio.titulo, aleatorio.descripcion);
+        }
+    } catch (e) {}
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    const userJson = sessionStorage.getItem("user");
+    if (userJson) {
+        const user = JSON.parse(userJson);
+        const alertShown = sessionStorage.getItem("welcomeAlertShown");
+        if (!alertShown) {
+            const rol = user.roles?.nombre_role || user.rol || "cliente";
+            const msg = rol === "admin" ? "Bienvenido Administrador" : "Bienvenido Cliente";
+            mostrarToastPublicidad('/static/uploads/logo.png', "Sesión Iniciada", msg);
+            sessionStorage.setItem("welcomeAlertShown", "true");
+        }
+    }
+
+    setTimeout(mostrarNotificacionAleatoria, 1000);
+    setInterval(mostrarNotificacionAleatoria, 6000);
+});
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {

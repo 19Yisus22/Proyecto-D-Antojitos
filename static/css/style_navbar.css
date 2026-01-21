@@ -1,0 +1,225 @@
+.navbar {
+    background: #ffffff;
+    padding: 0.5rem 0;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1040 !important;
+    box-shadow: 0 4px 20px rgba(219, 112, 147, 0.08);
+    border-bottom: 1px solid rgba(219, 112, 147, 0.05);
+}
+
+.nav-gap-custom {
+    gap: 2rem;
+}
+
+.nav-icon-link {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    padding: 0.6rem !important;
+    color: #4a5568 !important;
+    min-width: 85px;
+    position: relative;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    border-radius: 12px;
+}
+
+.nav-icon-link i {
+    font-size: 1.6rem;
+    margin-bottom: 4px;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.nav-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    opacity: 0.8;
+    transition: opacity 0.3s ease;
+}
+
+.nav-icon-link:hover {
+    color: #db7093 !important;
+    background: rgba(219, 112, 147, 0.04);
+}
+
+.nav-icon-link:hover i {
+    transform: translateY(-4px) scale(1.1);
+}
+
+.nav-icon-link:hover .nav-label {
+    opacity: 1;
+}
+
+.cart-badge-overlap {
+    position: absolute;
+    top: 4px;
+    right: 22px;
+    background: linear-gradient(135deg, #db7093, #ff8da1);
+    color: white;
+    font-size: 0.65rem;
+    font-weight: 800;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #ffffff;
+    box-shadow: 0 3px 6px rgba(219, 112, 147, 0.4);
+}
+
+.profile-trigger {
+    padding: 0.5rem 1.2rem !important;
+    background: #fff0f5;
+    border-radius: 50px;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    border: 1px solid transparent;
+}
+
+.profile-trigger:hover {
+    background: #ffe4ef;
+    border-color: rgba(219, 112, 147, 0.2);
+    transform: translateY(-1px);
+}
+
+.profile-img-container {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 2px solid #ffffff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    flex-shrink: 0;
+}
+
+.profile-img-container img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.profile-name {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #2d3748;
+    line-height: 1.2;
+}
+
+.profile-status {
+    font-size: 0.65rem;
+    color: #48bb78;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.profile-status::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    background: #48bb78;
+    border-radius: 50%;
+}
+
+.animate-dropdown {
+    animation: navSlide 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+    margin-top: 12px !important;
+    border-radius: 16px;
+    border: 1px solid rgba(0,0,0,0.05) !important;
+    padding: 0.8rem;
+}
+
+@keyframes navSlide {
+    from { opacity: 0; transform: translateY(20px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.dropdown-item {
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #4a5568;
+    transition: all 0.2s ease;
+}
+
+.dropdown-item:hover {
+    background-color: #fff0f5;
+    color: #db7093;
+    padding-left: 1.2rem;
+}
+
+.dropdown-header {
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: #db7093 !important;
+    letter-spacing: 1.2px;
+    padding-left: 1rem;
+}
+
+.publicidad-container, .custom-toast, #toastContainer {
+    z-index: 2000 !important;
+}
+
+@media (max-width: 991px) {
+    .navbar-brand img {
+        width: 45px;
+    }
+
+    .navbar-collapse {
+        background: #ffffff;
+        padding: 1.2rem;
+        border-radius: 20px;
+        margin-top: 15px;
+        box-shadow: 0 15px 35px rgba(219, 112, 147, 0.15);
+        border: 1px solid rgba(219, 112, 147, 0.1);
+    }
+
+    .nav-gap-custom { 
+        gap: 0.4rem; 
+        margin-top: 1rem; 
+        padding-bottom: 0.5rem;
+    }
+
+    .nav-icon-link { 
+        flex-direction: row !important; 
+        min-width: auto; 
+        gap: 12px; 
+        padding: 0.7rem 1rem !important;
+        width: 100%;
+        justify-content: flex-start;
+        border-radius: 12px;
+    }
+
+    .nav-icon-link i {
+        margin-bottom: 0;
+        font-size: 1.4rem;
+        width: 30px;
+        text-align: center;
+    }
+
+    .nav-label {
+        font-size: 0.85rem;
+        text-transform: none;
+        letter-spacing: 0;
+    }
+
+    .cart-badge-overlap {
+        position: relative;
+        top: 0;
+        right: 0;
+        margin-left: auto;
+    }
+
+    .profile-trigger { 
+        border-radius: 15px; 
+        margin-top: 15px; 
+        width: 100%;
+        justify-content: flex-start;
+        padding: 0.8rem !important;
+    }
+}

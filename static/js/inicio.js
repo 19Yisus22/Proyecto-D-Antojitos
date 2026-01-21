@@ -100,7 +100,7 @@ function mostrarToastPublicidad(imagen, titulo, descripcion, isError = false) {
     };
     
     t.querySelector('.btn-close-toast').onclick = remove;
-    setTimeout(remove, 6000);
+    setTimeout(remove, 2000);
 }
 
 async function mostrarNotificacionAleatoria(){
@@ -129,8 +129,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     cargarMarketing();
-    setTimeout(mostrarNotificacionAleatoria, 1500);
-    setInterval(mostrarNotificacionAleatoria, 45000);
+    setTimeout(mostrarNotificacionAleatoria, 1000);
+    setInterval(mostrarNotificacionAleatoria, 6000);
 });
 
 if ('serviceWorker' in navigator) {

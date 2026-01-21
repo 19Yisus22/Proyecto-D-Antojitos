@@ -86,11 +86,11 @@ h2 {
 }
 
 #toastContainer {
+    position: fixed;
     top: 1rem;
-    left: 1rem;
-    right: auto;
-    bottom: auto;
+    right: 1rem;
     z-index: 1080;
+    max-width: 320px;
 }
 
 .footer-container {
@@ -131,19 +131,21 @@ h2 {
 .custom-toast {
     background: #1a1a1a;
     color: white;
-    border-radius: 12px;
-    padding: 16px 20px;
-    min-width: 280px;
+    border-radius: 8px;
+    padding: 10px 14px;
+    min-width: 220px;
+    max-width: 280px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    box-shadow: 0 15px 30px rgba(0,0,0,0.2);
-    margin-bottom: 10px;
-    animation: toastSlideIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.25);
+    margin-bottom: 8px;
+    animation: toastSlideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    font-size: 0.85rem;
 }
 
 @keyframes toastSlideIn {
-    from { opacity: 0; transform: translateX(-100%); }
+    from { opacity: 0; transform: translateX(100%); }
     to { opacity: 1; transform: translateX(0); }
 }
 
@@ -152,14 +154,14 @@ h2 {
 }
 
 .pedido-card.seleccion {
-border: 2px solid red;
-transition: none;
+    border: 2px solid red;
+    transition: none;
 }
 
 .card-collapsed .card-body {
-  display: none;
+    display: none;
 }
 
 .icono {
-  cursor: pointer;
+    cursor: pointer;
 }

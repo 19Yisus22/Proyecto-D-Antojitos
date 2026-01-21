@@ -1,5 +1,6 @@
 let carruselIndex = 0, seccionIndex = 0;
 let carruselUrls = {}, seccionesUrls = {};
+let procesamientoEnCurso = false;
 
 function toast(msg, tipo = "success") {
     const div = document.createElement("div");
@@ -7,6 +8,37 @@ function toast(msg, tipo = "success") {
     div.innerHTML = `<div class="d-flex"><div class="toast-body">${msg}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>`;
     document.getElementById("toastContainer").appendChild(div);
     setTimeout(() => div.remove(), 3000);
+}
+
+function showConfirmToast(msg, callback) {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = 'toast align-items-center text-bg-warning border-0 show';
+    toast.style.minWidth = "300px";
+    toast.innerHTML = `
+        <div class="d-flex flex-column p-2">
+            <div class="d-flex align-items-center mb-2">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                <span class="fw-bold">${msg}</span>
+            </div>
+            <div class="d-flex justify-content-end gap-2">
+                <button class="btn btn-sm btn-outline-secondary btn-cancel">Cancelar</button>
+                <button class="btn btn-sm btn-danger btn-confirm">Confirmar</button>
+            </div>
+        </div>
+    `;
+    container.appendChild(toast);
+
+    const remove = () => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    };
+
+    toast.querySelector('.btn-cancel').onclick = remove;
+    toast.querySelector('.btn-confirm').onclick = () => {
+        callback();
+        remove();
+    };
 }
 
 document.getElementById("archivoNotificacion").addEventListener("change", e => {
@@ -21,14 +53,27 @@ document.getElementById("archivoNotificacion").addEventListener("change", e => {
 });
 
 async function crearNotificacion() {
+    if (procesamientoEnCurso) {
+        toast("Por favor espere, procesando solicitud anterior...", "warning");
+        return;
+    }
+
     const fileInput = document.getElementById("archivoNotificacion");
     const titulo = document.getElementById("tituloNotificacion").value.trim();
     const desc = document.getElementById("descNotificacion").value.trim();
     if (!titulo || !desc) { toast("Complete los campos", "warning"); return; }
+    
+    procesamientoEnCurso = true;
+    const btn = event.target;
+    const textoOriginal = btn.innerText;
+    btn.disabled = true;
+    btn.innerText = "Procesando...";
+
     const formData = new FormData();
     formData.append("titulo", titulo);
     formData.append("descripcion", desc);
     if (fileInput.files[0]) formData.append("archivo", fileInput.files[0]);
+    
     fetch("/api/admin/notificaciones", { method: "POST", body: formData }).then(r => r.json()).then(d => {
         toast(d.msg);
         fileInput.value = "";
@@ -36,6 +81,10 @@ async function crearNotificacion() {
         document.getElementById("tituloNotificacion").value = "";
         document.getElementById("descNotificacion").value = "";
         cargarAlertas();
+    }).finally(() => {
+        procesamientoEnCurso = false;
+        btn.disabled = false;
+        btn.innerText = textoOriginal;
     });
 }
 
@@ -84,6 +133,16 @@ function toggleEditarNotificacion(btn) {
 }
 
 async function guardarEdicionNotificacion(btn, id) {
+    if (procesamientoEnCurso) {
+        toast("Por favor espere, procesando solicitud anterior...", "warning");
+        return;
+    }
+
+    procesamientoEnCurso = true;
+    const textoOriginal = btn.innerText;
+    btn.disabled = true;
+    btn.innerText = "...";
+
     const item = btn.closest('.notificacion-item');
     const formData = new FormData();
     formData.append("titulo", item.querySelector('.edit-titulo').value);
@@ -100,17 +159,32 @@ async function guardarEdicionNotificacion(btn, id) {
         } else {
             toast(d.error || "Error al actualizar", "danger");
         }
+    }).finally(() => {
+        procesamientoEnCurso = false;
+        btn.disabled = false;
+        btn.innerText = textoOriginal;
     });
 }
 
 function eliminarNotificacion(id, el) {
-    if (confirm("¿Eliminar definitivamente?")) {
+    if (procesamientoEnCurso) {
+        toast("Por favor espere, procesando solicitud anterior...", "warning");
+        return;
+    }
+
+    showConfirmToast("¿Eliminar esta notificación definitivamente?", () => {
+        procesamientoEnCurso = true;
         fetch(`/api/admin/notificaciones/${id}`, { method: "DELETE" })
         .then(r => r.json())
         .then(d => {
-            if(d.ok) el.remove();
+            if(d.ok) {
+                toast("Notificación eliminada");
+                el.remove();
+            }
+        }).finally(() => {
+            procesamientoEnCurso = false;
         });
-    }
+    });
 }
 
 function agregarCarrusel(url = "", titulo = "", desc = "") {
@@ -210,6 +284,12 @@ function actualizarPreview() {
 }
 
 async function guardarMarketing() {
+    if (procesamientoEnCurso) {
+        toast("Por favor espere, procesando solicitud anterior...", "warning");
+        return;
+    }
+
+    procesamientoEnCurso = true;
     const btn = document.getElementById("btnGuardarMarketing");
     btn.disabled = true;
     btn.innerText = "Procesando...";
@@ -257,6 +337,8 @@ async function guardarMarketing() {
         }
     } catch (error) {
         toast("Error al guardar", "danger");
+    } finally {
+        procesamientoEnCurso = false;
         btn.disabled = false;
         btn.innerText = "Guardar y Publicar";
     }
