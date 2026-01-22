@@ -173,8 +173,11 @@ async function cargarPedidos(isAutoRefresh = false) {
         if (ultimoIdPedidoNotificado !== 0 && maxIdActual > ultimoIdPedidoNotificado) {
             notificarNuevoPedido();
         }
-        ultimoIdPedidoNotificado = maxIdActual;
-        localStorage.setItem("ultimoIdPedidoNotificado", ultimoIdPedidoNotificado);
+        
+        if (maxIdActual > 0) {
+            ultimoIdPedidoNotificado = maxIdActual;
+            localStorage.setItem("ultimoIdPedidoNotificado", ultimoIdPedidoNotificado);
+        }
 
         pedidosGlobal = pedidos.map(pedido => {
             const facturaFormateada = generarNumeroFactura(pedido.id_pedido, pedido.fecha_pedido);
@@ -187,7 +190,7 @@ async function cargarPedidos(isAutoRefresh = false) {
                 const itemId = `${pedido.id_pedido}-${idx}`;
                 let pagadoItem = estadosPagoGuardados[itemId] !== undefined ? estadosPagoGuardados[itemId] : (item.pagado !== undefined ? item.pagado : pedido.pagado);
                 return { 
-                    html: `<tr><td>${item.nombre_producto}</td><td>${item.cantidad}</td><td>${item.subtotal.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</td><td><i class="bi ${pagadoItem ? 'bi-check-circle text-success' : 'bi-x-circle text-danger'} fs-4 toggle-pago-item" style="cursor:pointer" data-item-id="${itemId}" data-pagado="${pagadoItem}"></i></td></tr>`, 
+                    html: `<tr><td>${item.gestion_productos?.nombre || item.nombre_producto || 'Producto'}</td><td>${item.cantidad}</td><td>${item.subtotal.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</td><td><i class="bi ${pagadoItem ? 'bi-check-circle text-success' : 'bi-x-circle text-danger'} fs-4 toggle-pago-item" style="cursor:pointer" data-item-id="${itemId}" data-pagado="${pagadoItem}"></i></td></tr>`, 
                     pagado: pagadoItem 
                 };
             });
@@ -215,6 +218,13 @@ async function cargarPedidos(isAutoRefresh = false) {
             const fechaStr = pedido.fecha_pedido ? new Date(pedido.fecha_pedido).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' }) : '---';
             let textoPago = todosPagos ? 'Pagado' : `Pendiente (${estadosPagoArray.filter(p => !p).length})`;
 
+            const nombreCliente = `${user.nombre || ''} ${user.apellido || ''}`.trim() || 'Sin nombre';
+            const cedulaCliente = user.cedula || 'Sin cédula';
+            const telefonoCliente = user.telefono || 'Sin teléfono';
+            const correoCliente = user.correo || 'Sin correo';
+            const direccionCliente = user.direccion || 'Sin dirección';
+            const metodoPagoCliente = user.metodo_pago || 'Efectivo';
+
             card.innerHTML = `
                 <div class="card border-0 bg-transparent">
                     <div class="card-header d-flex justify-content-between align-items-center bg-transparent border-0">
@@ -227,15 +237,51 @@ async function cargarPedidos(isAutoRefresh = false) {
                     </div>
                     <div class="card-body">
                         <div class="row mb-3">
-                            <div class="col-md-6 border-end">
-                                <p class="mb-1"><strong>Cliente:</strong> ${user.nombre || 'N/A'} ${user.apellido || ''}</p>
-                                <p class="mb-1"><strong>Cédula:</strong> ${user.cedula || 'N/A'}</p>
-                                <p class="mb-1"><strong>Teléfono:</strong> ${user.telefono || 'N/A'}</p>
+                            <div class="col-md-6 mb-3 mb-md-0">
+                                <div class="d-flex align-items-start mb-2">
+                                    <i class="bi bi-person-fill text-primary me-2 fs-5"></i>
+                                    <div class="flex-grow-1">
+                                        <small class="text-muted d-block">Cliente</small>
+                                        <strong>${nombreCliente}</strong>
+                                    </div>
+                                </div>
+                                <div class="d-flex align-items-start mb-2">
+                                    <i class="bi bi-card-text text-primary me-2 fs-5"></i>
+                                    <div class="flex-grow-1">
+                                        <small class="text-muted d-block">Cédula</small>
+                                        <strong>${cedulaCliente}</strong>
+                                    </div>
+                                </div>
+                                <div class="d-flex align-items-start mb-2">
+                                    <i class="bi bi-telephone-fill text-primary me-2 fs-5"></i>
+                                    <div class="flex-grow-1">
+                                        <small class="text-muted d-block">Teléfono</small>
+                                        <strong>${telefonoCliente}</strong>
+                                    </div>
+                                </div>
+                                <div class="d-flex align-items-start">
+                                    <i class="bi bi-credit-card-fill text-primary me-2 fs-5"></i>
+                                    <div class="flex-grow-1">
+                                        <small class="text-muted d-block">Método de Pago</small>
+                                        <strong>${metodoPagoCliente}</strong>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="col-md-6 text-md-end">
-                                <p class="mb-1"><strong>Correo:</strong> ${user.correo || 'N/A'}</p>
-                                <p class="mb-1"><strong>Dirección:</strong> ${user.direccion || 'N/A'}</p>
-                                <p class="mb-1"><strong>Pago:</strong> ${user.metodo_pago || 'Efectivo'}</p>
+                            <div class="col-md-6">
+                                <div class="d-flex align-items-start mb-2">
+                                    <i class="bi bi-envelope-fill text-primary me-2 fs-5"></i>
+                                    <div class="flex-grow-1">
+                                        <small class="text-muted d-block">Correo Electrónico</small>
+                                        <strong class="text-break small">${correoCliente}</strong>
+                                    </div>
+                                </div>
+                                <div class="d-flex align-items-start">
+                                    <i class="bi bi-geo-alt-fill text-primary me-2 fs-5"></i>
+                                    <div class="flex-grow-1">
+                                        <small class="text-muted d-block">Dirección de Entrega</small>
+                                        <strong class="text-break small">${direccionCliente}</strong>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         <table class="table table-sm text-center">

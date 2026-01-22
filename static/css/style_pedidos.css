@@ -4,7 +4,7 @@ html, body {
     display: flex;
     flex-direction: column;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: #fff8f0;
+    background: linear-gradient(135deg, #fff8f0 0%, #ffe8e8 100%);
     scroll-behavior: smooth;
 }
 
@@ -17,13 +17,27 @@ h2 {
     font-weight: 700;
     text-align: center;
     margin-bottom: 2rem;
-    text-shadow: 1px 1px 3px rgba(0,0,0,0.1);
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.15);
     transition: all 0.3s ease;
 }
 
+.card-title-marketing {
+    background: linear-gradient(135deg, #d35400 0%, #e67e22 100%);
+    color: white;
+    padding: 1.5rem;
+    border-radius: 15px;
+    box-shadow: 0 8px 20px rgba(211, 84, 0, 0.3);
+}
+
+.card-title-marketing h3 {
+    margin: 0;
+    font-weight: 700;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+}
+
 .pedido-card {
-    border-radius: 12px;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+    border-radius: 15px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.1);
     margin-bottom: 1rem;
     transition: transform 0.3s ease, box-shadow 0.3s ease, border 0.3s ease;
     overflow: hidden;
@@ -33,23 +47,23 @@ h2 {
 
 .pedido-activo {
     border-left-color: #0d6efd;
-    background: #f0f7ff;
+    background: linear-gradient(135deg, #f0f7ff 0%, #e3f2fd 100%);
 }
 
 .pedido-finalizado {
     border-left-color: #198754;
-    background: #f0fff4;
+    background: linear-gradient(135deg, #f0fff4 0%, #e8f5e9 100%);
 }
 
 .pedido-anulado {
     border-left-color: #dc3545;
-    background: #fff5f5;
+    background: linear-gradient(135deg, #fff5f5 0%, #ffebee 100%);
 }
 
 @keyframes highlightNew {
-    0% { background-color: #fff3cd; }
-    50% { background-color: #ffeeba; }
-    100% { background-color: inherit; }
+    0% { background-color: #fff3cd; transform: scale(1); }
+    50% { background-color: #ffeeba; transform: scale(1.02); }
+    100% { background-color: inherit; transform: scale(1); }
 }
 
 .animacion-nuevo {
@@ -58,12 +72,16 @@ h2 {
 
 .pedido-card:hover {
     transform: translateY(-5px);
-    box-shadow: 0 10px 20px rgba(0,0,0,0.12);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.15);
 }
 
 .pedido-card.seleccion {
-    border: 2px solid #dc3545;
-    box-shadow: 0 0 10px rgba(220, 53, 69, 0.5);
+    border: 3px solid #dc3545;
+    box-shadow: 0 0 15px rgba(220, 53, 69, 0.6);
+}
+
+.pedido-card.fijado {
+    border: 2px solid #0d6efd;
 }
 
 .card-collapsed .card-body {
@@ -73,24 +91,42 @@ h2 {
 
 .card-header .toggle-detalle {
     cursor: pointer;
-    transition: transform 0.3s ease;
+    transition: transform 0.3s ease, color 0.3s ease;
 }
 
-.card-collapsed .card-header .toggle-detalle {
-    transform: rotate(0deg);
+.pedido-card:not(.card-collapsed) .card-header .toggle-detalle {
+    transform: rotate(180deg);
 }
 
 .card-header .toggle-detalle:hover {
     color: #d35400;
+    transform: rotate(180deg) scale(1.2);
+}
+
+.card-collapsed .card-header .toggle-detalle:hover {
+    transform: scale(1.2);
+}
+
+.btn-fijar {
+    transition: all 0.3s ease;
+}
+
+.btn-fijar:hover {
+    transform: scale(1.2);
 }
 
 .estado-select, .btn {
     transition: all 0.3s ease;
 }
 
-.estado-select:hover, .btn:hover {
-    transform: scale(1.03);
+.estado-select:hover {
+    transform: scale(1.02);
     box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.15);
 }
 
 .table {
@@ -101,6 +137,14 @@ h2 {
 
 .table th, .table td {
     vertical-align: middle !important;
+}
+
+.toggle-pago-item {
+    transition: all 0.3s ease;
+}
+
+.toggle-pago-item:hover {
+    transform: scale(1.2);
 }
 
 #toastContainer {
@@ -142,6 +186,15 @@ h2 {
     }
 }
 
+.btn-close-toast {
+    transition: transform 0.2s ease;
+    cursor: pointer;
+}
+
+.btn-close-toast:hover {
+    transform: scale(1.2);
+}
+
 .footer-container {
     margin-top: auto;
 }
@@ -171,4 +224,69 @@ h2 {
 
 .icono {
     cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.icono:hover {
+    transform: scale(1.1);
+}
+
+.btn-select-delete:hover {
+    color: #dc3545 !important;
+}
+
+.form-control, .form-select {
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #e67e22;
+    box-shadow: 0 0 0 0.2rem rgba(230, 126, 34, 0.25);
+}
+
+.input-group-text {
+    background-color: #f8f9fa;
+    border: 2px solid #e0e0e0;
+}
+
+.badge {
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
+    font-weight: 600;
+}
+
+@media (max-width: 768px) {
+    .card-title-marketing h3 {
+        font-size: 1.5rem;
+    }
+
+    .pedido-card {
+        margin-bottom: 1.5rem;
+    }
+
+    #toastContainer {
+        width: 280px;
+        right: 10px;
+    }
+
+    .btn {
+        padding: 0.5rem 1rem;
+        font-size: 0.9rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .card-title-marketing {
+        padding: 1rem;
+    }
+
+    .pedido-card {
+        border-radius: 12px;
+    }
+
+    .table {
+        font-size: 0.85rem;
+    }
 }

@@ -950,28 +950,19 @@ def obtener_pedidos():
     if not user_id:
         return jsonify([]), 401
     
-    pedidos_res = (
-        supabase.table("pedidos")
-        .select("""*, usuarios(id_cliente, nombre, apellido, cedula, metodo_pago, imagen_url), pedido_detalle(*, gestion_productos(nombre, precio, imagen_url))""")
-        .order("fecha_pedido", desc=True)
-        .execute()
-    )
-
+    pedidos_res = (supabase.table("pedidos").select(""" *, usuarios(id_cliente, nombre, apellido, cedula, telefono, correo, direccion, metodo_pago, imagen_url), pedido_detalle(*, gestion_productos(nombre, precio, imagen_url)) """).order("fecha_pedido", desc=True).execute())
     pedidos = pedidos_res.data or []
 
     for p in pedidos:
-
         if p.get("estado") == "Pendiente":
             p["estado_factura"] = "Emitida"
-
         elif p.get("estado") == "Entregado" and p.get("pagado"):
             p["estado_factura"] = "Pagada"
-
         elif p.get("estado") == "Cancelado":
             p["estado_factura"] = "Anulada"
-
         else:
             p["estado_factura"] = "Emitida"
+            
     return jsonify(pedidos)
 
 @app.route("/enviar_pedido", methods=["POST"])
@@ -1421,7 +1412,7 @@ if __name__ == "__main__":
     port = 8000
     local_ip = get_local_ip()
 
-    debug_mode = False
+    debug_mode = True
 
     if debug_mode:
         print("⚡ Ejecutando en modo DEBUG con servidor de desarrollo de Flask")

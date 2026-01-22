@@ -2,24 +2,84 @@ let facturasActuales = [];
 let paginaActual = 1;
 const itemsPorPagina = 5;
 let productosCarrito = [];
+let facturasLocalesCache = [];
+
+function showConfirmToast(msg, callback) {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+
+    const t = document.createElement('div');
+    t.className = 'custom-toast bg-dark text-white p-3 shadow-lg mb-2';
+    t.style.cssText = `
+        border-left: 4px solid #ffc107;
+        min-width: 300px;
+        border-radius: 8px;
+        pointer-events: auto !important;
+        opacity: 1;
+        display: block;
+    `;
+
+    t.innerHTML = `
+        <div class="mb-3">
+            <i class="bi bi-exclamation-triangle text-warning me-2"></i>
+            <strong>${msg}</strong>
+        </div>
+        <div class="d-flex gap-2 justify-content-end">
+            <button class="btn btn-sm btn-outline-light border-0 btn-cancelar-confirm">Cancelar</button>
+            <button class="btn btn-sm btn-warning fw-bold px-3 btn-aceptar-confirm">Confirmar</button>
+        </div>
+    `;
+
+    container.appendChild(t);
+
+    t.querySelector('.btn-cancelar-confirm').onclick = (e) => {
+        e.stopPropagation();
+        t.style.opacity = '0';
+        setTimeout(() => t.remove(), 400);
+    };
+
+    t.querySelector('.btn-aceptar-confirm').onclick = (e) => {
+        e.stopPropagation();
+        callback();
+        t.remove();
+    };
+}
 
 function showMessage(msg, isError = false) {
     const container = document.getElementById('toastContainer');
+    if (!container) return;
+
     const toast = document.createElement('div');
-    toast.className = 'custom-toast';
-    toast.innerHTML = `
-        <div class="d-flex align-items-center">
-            <i class="bi ${isError ? 'bi-x-circle text-danger' : 'bi-check-circle text-success'} me-3 fs-5"></i>
-            <span>${msg}</span>
-        </div>
-        <i class="bi bi-x-lg ms-3 btn-close-toast" style="cursor:pointer; font-size: 0.7rem;"></i>
+    toast.className = 'custom-toast bg-dark text-white p-3 shadow-lg mb-2';
+    toast.style.cssText = `
+        border-left: 4px solid ${isError ? '#dc3545' : '#198754'};
+        min-width: 300px;
+        border-radius: 8px;
+        pointer-events: auto !important;
     `;
+
+    toast.innerHTML = `
+        <div class="d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center">
+                <i class="bi ${isError ? 'bi-x-circle text-danger' : 'bi-check-circle text-success'} me-3 fs-5"></i>
+                <span>${msg}</span>
+            </div>
+            <i class="bi bi-x-lg ms-3 btn-close-toast" style="cursor:pointer; font-size: 0.7rem;"></i>
+        </div>
+    `;
+
     container.appendChild(toast);
+
     const remove = () => {
         toast.style.opacity = '0';
         setTimeout(() => toast.remove(), 400);
     };
-    toast.querySelector('.btn-close-toast').onclick = remove;
+
+    toast.querySelector('.btn-close-toast').onclick = (e) => {
+        e.stopPropagation();
+        remove();
+    };
+
     setTimeout(remove, 3500);
 }
 
@@ -397,91 +457,260 @@ if (inputBuscar) {
     };
 }
 
+async function monitorearCambiosFacturas() {
+    const cedula = document.getElementById("buscarFactura")?.value.trim();
+    if (!cedula) return;
+
+    try {
+        const res = await fetch(`/buscar_facturas?cedula=${cedula}`);
+        if (!res.ok) return;
+        
+        const facturasServidor = await res.json();
+        
+        if (facturasLocalesCache.length > 0) {
+            facturasServidor.forEach(fServ => {
+                const fLocal = facturasLocalesCache.find(l => l.id_factura === fServ.id_factura);
+                
+                if (fLocal && fLocal.estado !== fServ.estado) {
+                    lanzarNotificacionMultidispositivo(fServ, fServ.estado);
+                }
+            });
+
+            const idsServidor = facturasServidor.map(f => f.id_factura);
+            const huboEliminacion = facturasLocalesCache.some(f => !idsServidor.includes(f.id_factura));
+            
+            if (huboEliminacion) {
+                showMessage("La lista de pedidos se ha actualizado");
+            }
+        }
+
+        facturasLocalesCache = facturasServidor;
+        facturasActuales = [...facturasServidor].sort((a,b) => new Date(b.fecha_emision) - new Date(a.fecha_emision));
+        mostrarFacturasBuscadas();
+
+    } catch (e) {
+        console.error("Error en sincronización:", e);
+    }
+}
+
+function lanzarNotificacionMultidispositivo(fObj, estado) {
+    playNotificationSound();
+    
+    const fechaEmi = new Date(fObj.fecha_emision);
+    const anio = fechaEmi.getFullYear();
+    const numRef = fObj.numero_factura.toString().split('-').pop();
+    const facturaFormateada = `F-${anio}-${numRef}`;
+
+    let configuracion = {
+        color: "primary",
+        icono: "bi-info-circle-fill",
+        titulo: "Actualización de Pedido"
+    };
+
+    if (estado === "Anulada") {
+        configuracion = { color: "danger", icono: "bi-x-circle-fill", titulo: "Pedido Anulado" };
+    } else if (estado === "Pagada" || estado === "Finalizado") {
+        configuracion = { color: "success", icono: "bi-check-circle-fill", titulo: "Pago Confirmado" };
+    } else if (estado === "Emitida" || estado === "Emitido") {
+        configuracion = { color: "info", icono: "bi-send-fill", titulo: "Pedido Emitido" };
+    }
+
+    if (Notification.permission === "granted") {
+        new Notification(configuracion.titulo, {
+            body: `Tu factura ${facturaFormateada} ha pasado al estado: ${estado}`,
+            icon: "/static/uploads/logo.png"
+        });
+    }
+
+    const cont = document.getElementById("toastContainer");
+    if (!cont) return;
+
+    const t = document.createElement("div");
+    t.className = `custom-toast bg-dark text-white border-0 shadow-lg mb-2`;
+    t.style.borderLeft = `5px solid var(--bs-${configuracion.color})`;
+    t.style.minWidth = "300px";
+    
+    t.innerHTML = `
+        <div class="d-flex align-items-center p-2">
+            <i class="bi ${configuracion.icono} text-${configuracion.color} fs-4 me-3"></i>
+            <div class="flex-grow-1">
+                <strong style="font-size: 0.85rem;" class="d-block">${configuracion.titulo}</strong>
+                <small class="text-white-50">Factura ${facturaFormateada}: </small>
+                <span class="badge bg-${configuracion.color}" style="font-size: 0.65rem;">${estado}</span>
+            </div>
+            <i class="bi bi-x-lg ms-2 btn-close-toast" style="cursor:pointer; font-size: 0.7rem;"></i>
+        </div>`;
+        
+    cont.appendChild(t);
+    const remove = () => {
+        t.style.opacity = '0';
+        setTimeout(() => t.remove(), 400);
+    };
+    t.querySelector('.btn-close-toast').onclick = remove;
+    setTimeout(remove, 7000);
+}
+
+async function anularFactura(idFactura) {
+    showConfirmToast("¿Estás seguro de que deseas anular este pedido?", async () => {
+        try {
+            const res = await fetch(`/facturas/${idFactura}/anular`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json"
+                }
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                showMessage("Pedido anulado correctamente");
+                if (typeof monitorearCambiosFacturas === 'function') {
+                    await monitorearCambiosFacturas();
+                }
+            } else {
+                showMessage(data.message || "No se pudo anular el pedido", true);
+            }
+        } catch (error) {
+            console.error("Error al anular:", error);
+            showMessage("Error de conexión con el servidor", true);
+        }
+    });
+}
+
+async function eliminarFacturaDefinitiva(idFactura) {
+    showConfirmToast("¿Quitar esta factura de la lista visual?", () => {
+        facturasActuales = facturasActuales.filter(f => f.id_factura !== idFactura);
+        mostrarFacturasBuscadas();
+        showMessage("Vista actualizada");
+    });
+}
+
 function mostrarFacturasBuscadas() {
     const container = document.getElementById("facturasContainer");
     if (!container) return;
     container.innerHTML = "";
+    
     const filtro = document.getElementById("filtroEstado");
     const filter = filtro ? filtro.value : "";
     
     let filtradas = facturasActuales;
     if (filter && filter !== "") filtradas = facturasActuales.filter(f => f.estado === filter);
-    const inicio = (paginaActual - 1) * itemsPorPagina;
-    const paginadas = filtradas.slice(inicio, inicio + itemsPorPagina);
+    
+    const paginadas = filtradas.slice((paginaActual - 1) * itemsPorPagina, paginaActual * itemsPorPagina);
 
     if (paginadas.length === 0) {
-        container.innerHTML = '<p class="text-center p-4">No se encontraron registros.</p>';
+        container.innerHTML = '<div class="text-center p-5 text-muted bg-white rounded-4 shadow-sm"><i class="bi bi-search fs-1"></i><p class="mt-2">No encontramos registros</p></div>';
         return;
     }
 
-    paginadas.forEach(f => {
+    paginadas.forEach((f, index) => {
         const card = document.createElement("div");
-        card.className = "card mb-4 border-0 shadow-sm rounded-4 overflow-hidden";
-        let filas = "";
-        let total = 0;
+        card.className = `factura-card ${f.estado === 'Anulada' ? 'opacity-75' : ''} fade-in-item`;
+        
+        const fechaEmi = new Date(f.fecha_emision);
+        const anio = fechaEmi.getFullYear();
+        const numeroEntero = filtradas.length - ((paginaActual - 1) * itemsPorPagina + index);
+        const facturaFormateada = `F-${anio}-${numeroEntero}`;
+
+        let detalleHtml = "";
+        let totalCalculado = 0;
         (f.productos || []).forEach(p => {
-            total += Number(p.subtotal);
-            filas += `
-                <tr>
-                    <td><span>${p.nombre_producto}</span></td>
-                    <td class="text-center">x${p.cantidad}</td>
-                    <td class="text-end">${Number(p.subtotal).toLocaleString('es-CO',{style:'currency',currency:'COP'})}</td>
-                </tr>`;
+            totalCalculado += Number(p.subtotal);
+            detalleHtml += `
+                <div class="item-row">
+                    <span class="text-dark">${p.nombre_producto}</span>
+                    <span class="text-muted small">x${p.cantidad}</span>
+                    <span class="fw-bold">${Number(p.subtotal).toLocaleString('es-CO', {style: 'currency', currency: 'COP', maximumFractionDigits: 0})}</span>
+                </div>`;
         });
 
-        const userImg = f.imagen_usuario 
-            ? `<img src="${f.imagen_usuario}" class="rounded-circle me-3 shadow-sm border border-2 border-white" width="45" height="45" style="object-fit:cover;" onerror="this.onerror=null; this.src='https://cdn-icons-png.flaticon.com/512/149/149071.png';">`
-            : `<div class="rounded-circle me-3 bg-secondary d-flex align-items-center justify-content-center shadow-sm" style="width:45px; height:45px;"><i class="bi bi-person text-white"></i></div>`;
+        let colorBadge = "primary";
+        if (f.estado === "Anulada") colorBadge = "danger";
+        else if (f.estado === "Pagado" || f.estado === "Finalizado") colorBadge = "success";
+        else if (f.estado === "Emitido") colorBadge = "info";
 
         card.innerHTML = `
-            <div class="card-header bg-white pt-4 px-4 border-0">
+            <div class="factura-header">
                 <div class="d-flex justify-content-between align-items-center">
                     <div class="d-flex align-items-center">
-                        ${userImg}
+                        <div class="rounded-circle bg-dark text-white d-flex align-items-center justify-content-center me-3" style="width:45px; height:45px;">
+                            <i class="bi bi-receipt fs-5"></i>
+                        </div>
                         <div>
-                            <h6 class="fw-bold mb-0">Factura #${f.numero_factura}</h6>
-                            <small class="text-muted">${new Date(f.fecha_emision).toLocaleString()}</small>
+                            <h6 class="fw-bold mb-0">Factura ${facturaFormateada}</h6>
+                            <small class="text-muted">${fechaEmi.toLocaleString('es-CO', {dateStyle: 'medium', timeStyle: 'short'})}</small>
                         </div>
                     </div>
-                    <div class="d-flex gap-2">
-                         <button class="btn btn-sm btn-dark btn-pdf px-3"><i class="bi bi-download"></i> PDF</button>
-                         <span class="badge bg-dark rounded-pill px-3">${f.estado}</span>
-                    </div>
+                    <span class="badge badge-status bg-${colorBadge}">${f.estado}</span>
                 </div>
             </div>
-            <div class="card-body px-4">
-                <table class="table table-sm table-borderless align-middle mb-0">
-                    <thead>
-                        <tr class="text-muted small border-bottom">
-                            <th>PRODUCTO</th>
-                            <th class="text-center">CANT.</th>
-                            <th class="text-end">SUBTOTAL</th>
-                        </tr>
-                    </thead>
-                    <tbody>${filas}</tbody>
-                </table>
+            <div class="factura-body">
+                <div class="mb-2 small text-uppercase text-muted fw-bold" style="letter-spacing: 1px;">Detalles del pedido</div>
+                <div class="lista-productos">
+                    ${detalleHtml}
+                </div>
             </div>
-            <div class="card-footer bg-light border-0 p-4">
+            <div class="factura-footer">
                 <div class="d-flex justify-content-between align-items-center">
-                    <button class="btn btn-sm btn-link text-danger p-0 btn-anular fw-bold" ${f.estado==='Anulada'?'disabled':''} style="text-decoration:none;">Anular pedido</button>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-dark px-3 btn-pdf-action">
+                            <i class="bi bi-file-earmark-pdf"></i> PDF
+                        </button>
+                        ${f.estado !== 'Anulada' && f.estado !== 'Pagado' && f.estado !== 'Finalizado' ? 
+                            `<button class="btn btn-sm btn-outline-danger px-3 fw-bold btn-anular-action">Anular</button>` : 
+                            `<button class="btn btn-sm btn-link text-muted text-decoration-none btn-eliminar-action"><i class="bi bi-trash"></i> Quitar de la lista</button>`
+                        }
+                    </div>
                     <div class="text-end">
-                        <small class="text-muted d-block">Total a pagar</small>
-                        <span class="fw-bold fs-5 text-primary">${total.toLocaleString('es-CO',{style:'currency',currency:'COP'})}</span>
+                        <div class="small text-muted mb-0" style="font-size: 0.7rem;">TOTAL FACTURADO</div>
+                        <div class="fw-bold fs-5 text-primary">${totalCalculado.toLocaleString('es-CO', {style: 'currency', currency: 'COP', maximumFractionDigits: 0})}</div>
                     </div>
                 </div>
             </div>`;
         
-        card.querySelector(".btn-pdf").onclick = () => descargarPDF(f);
-        card.querySelector(".btn-anular").onclick = async () => {
-            if (confirm("¿Anular pedido?")) {
-                const r = await fetch(`/facturas/${f.id_factura}/anular`, { method: "PUT" });
-                if (r.ok) { showMessage("Pedido anulado"); f.estado = "Anulada"; mostrarFacturasBuscadas(); }
-            }
+        card.querySelector('.btn-pdf-action').onclick = () => {
+            f.numero_factura_visual = facturaFormateada;
+            descargarPDF(f);
         };
+        
+        const btnAnular = card.querySelector('.btn-anular-action');
+        if (btnAnular) btnAnular.onclick = () => anularFactura(f.id_factura);
+        
+        const btnEliminar = card.querySelector('.btn-eliminar-action');
+        if (btnEliminar) btnEliminar.onclick = () => eliminarFacturaDefinitiva(f.id_factura);
+        
         container.appendChild(card);
     });
     paginar(filtradas.length);
 }
+
+window.anularFactura = async function(idFactura) {
+    showConfirmToast("¿Deseas anular este pedido permanentemente?", async () => {
+        try {
+            const res = await fetch(`/facturas/${idFactura}/anular`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" }
+            });
+
+            if (res.ok) {
+                showMessage("Pedido anulado con éxito");
+                await monitorearCambiosFacturas();
+            } else {
+                const errData = await res.json();
+                showMessage(errData.message || "Error al anular", true);
+            }
+        } catch (error) {
+            showMessage("Error de comunicación", true);
+        }
+    });
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (Notification.permission !== "granted") {
+        Notification.requestPermission();
+    }
+    setInterval(monitorearCambiosFacturas, 4000);
+});
 
 function paginar(total) {
     const p = document.getElementById("paginacion");

@@ -35,14 +35,14 @@ function renderComentario(c) {
     const fecha = new Date(c.created_at).toLocaleString('es-CO', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
     
     const esMiPropioComentario = c.id_usuario === usuario.id_usuario;
-    const estaConectado = c.usuario_info?.conectado === true || esMiPropioComentario;
+    const estaConectado = c.usuario_info?.conectado === true;
     const claseEstado = estaConectado ? 'estado-conectado' : 'estado-desconectado';
 
     div.innerHTML = `
         <div class="d-flex align-items-start">
             <div class="contenedor-foto-estado me-3">
                 <img src="${foto}" class="rounded-circle foto-click border" width="50" height="50" style="object-fit:cover; cursor:pointer;">
-                <span class="punto-estado status-dot-${c.id_usuario} ${claseEstado}"></span>
+                <span class="punto-estado ${claseEstado}"></span>
             </div>
             <div class="flex-grow-1">
                 <div class="d-flex justify-content-between align-items-center mb-1">
