@@ -56,19 +56,25 @@ function renderPostres() {
     let hayAgotados = false;
     postres.forEach((p, index) => {
         const card = document.createElement("div");
-        card.className = "col-auto d-flex justify-content-center";
+        card.className = "col-4 mb-3 d-flex align-items-stretch";
         const imgUrl = p.imagen_url || "/static/uploads/default.png";
-        card.innerHTML = `<div class="card h-100 cursor-pointer ${p.stock <= 0 ? 'gris' : ''}">
+        card.innerHTML = `
+        <div class="card w-100 cursor-pointer ${p.stock <= 0 ? 'gris' : ''}">
             <img src="${imgUrl}" class="card-img-top postre-img">
-            <div class="card-body d-flex justify-content-between align-items-center">
-            <h5 class="card-title">${p.nombre}</h5>
-            <span class="badge bg-info text-dark">${p.stock}</span>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-1">
+                    <h5 class="card-title mb-0" title="${p.nombre}">${p.nombre}</h5>
+                    <span class="badge bg-info text-dark">${p.stock}</span>
+                </div>
+                <p class="card-text fw-bold">${Number(p.precio).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}</p>
             </div>
-            <p class="card-text fw-bold text-center">${Number(p.precio).toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</p>
         </div>`;
         card.querySelector(".card").addEventListener("click", () => abrirModalPostre(index));
         if (p.stock > 0) listaPostresDisponibles.appendChild(card);
-        else { listaPostresAgotados.appendChild(card); hayAgotados = true; }
+        else { 
+            listaPostresAgotados.appendChild(card); 
+            hayAgotados = true; 
+        }
     });
     avisoAgotados.classList.toggle("d-none", !hayAgotados);
 }

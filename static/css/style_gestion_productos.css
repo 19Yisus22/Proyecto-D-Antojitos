@@ -381,12 +381,25 @@ footer, .footer {
     }
 
     .postre-img {
-        height: 180px;
+        height: 120px;
     }
 
     #toastContainer {
         width: 280px;
         right: 10px;
+    }
+    
+    .card-title {
+        font-size: 0.85rem;
+    }
+    
+    .card-text {
+        font-size: 0.9rem;
+    }
+    
+    .badge {
+        padding: 0.2rem 0.5rem;
+        font-size: 0.7rem;
     }
 }
 

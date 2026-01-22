@@ -12,9 +12,10 @@
 <body>
 
     {% include 'navbar.html' %}
+    {% if session.get('user_id') and session.get('rol') == 'admin' %}
 
     <div class="main-content">
-        {% if session.get('user_id') and session.get('rol') == 'admin' %}
+        
         <div class="container-central">
             <div class="card-title-marketing mb-4 text-center">
                 <h3 class="display-6 fw-bold"><i class="bi bi-megaphone"></i> Sistema de Publicidad</h3>
@@ -78,14 +79,14 @@
 
                         <div class="col-12 mt-5">
                             <div class="card-title-marketing mb-3">
-                                <h3 class="h4"><i class="bi bi-info-circle-fill"></i> Información Informativa</h3>
+                                <h3 class="h4"><i class="bi bi-info-circle-fill"></i> Información Breve</h3>
                             </div>
                             <textarea id="infoInicio" class="form-control" rows="4" oninput="actualizarPreview()" placeholder="Escribe el texto informativo que verán los usuarios en la página de inicio..."></textarea>
                         </div>
 
                         <div class="col-12 mt-4">
                             <button id="btnGuardarMarketing" class="btn btn-dark btn-lg w-100 fw-bold py-3 shadow" onclick="guardarMarketing()">
-                                <i class="bi bi-cloud-arrow-up-fill"></i> GUARDAR Y PUBLICAR CAMBIOS
+                                <i class="bi bi-cloud-arrow-up-fill"></i> PUBLICAR CAMBIOS <i class="bi bi-cloud-arrow-up-fill"></i>
                             </button>
                         </div>
                     </div>
@@ -105,6 +106,7 @@
         </div>
 
         {% else %}
+
         <main class="container mt-5">
             <div class="card shadow-lg p-5 text-center border-0 rounded-4">
                 <div class="mb-4">
@@ -122,7 +124,9 @@
                 window.location.href = "{{ url_for('inicio') }}"; 
             }, 3000);
         </script>
+
         {% endif %}
+
     </div>
 
     {% include 'footer.html' %}

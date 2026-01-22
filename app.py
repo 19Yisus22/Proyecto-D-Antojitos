@@ -109,20 +109,18 @@ def index():
 
 @app.route("/obtener-cliente-id", methods=["GET"])
 def obtener_cliente_id():
-
+    
     cliente_id = os.getenv("GOOGLE_CLIENT_ID", "").strip()
 
     if not cliente_id:
-        return jsonify({"error": "Variable de entorno no configurada"}), 500
+        return jsonify({"error": "Falta Cliente de Google Auth"}), 500
     return jsonify({"client_id": cliente_id})
 
 @app.after_request
 def agregar_cabeceras(response):
-    
     response.headers['Cross-Origin-Opener-Policy'] = 'same-origin-allow-popups'
     response.headers['Cross-Origin-Resource-Policy'] = 'cross-origin'
     return response
-
 
 # APARTADO DE AUTENTICACIÓN
 
@@ -139,6 +137,7 @@ def inicio():
     if not res.data:
         session.clear()
         return render_template("inicio.html", user=None)
+
     user = res.data
     session["user"] = user
     just_logged_in = session.pop("just_logged_in", False)
@@ -147,51 +146,43 @@ def inicio():
     pedidos_nuevos = False
 
     if user.get("roles", {}).get("nombre_role") == "admin":
-        pedidos_res = supabase.table("pedidos").select("*").eq("estado", "nuevo").execute()
+        pedidos_res = supabase.table("pedidos").select("id_pedido").eq("estado", "nuevo").limit(1).execute()
         pedidos_nuevos = bool(pedidos_res.data)
     return render_template("inicio.html", user=user, just_logged_in=just_logged_in, pedidos_nuevos=pedidos_nuevos)
 
-@app.route("/registro", methods=["GET", "POST", "OPTIONS"])
+@app.route("/registro", methods=["GET", "POST"])
 def registro():
 
-    if request.method == "OPTIONS":
-        return "", 200
-    
     if request.method == "GET":
         return render_template("registro.html")
     
-    if not request.is_json:
-        return jsonify({"ok": False, "error": "Content-Type application/json requerido"}), 415
     payload = request.get_json()
-    cedula, nombre, apellido, telefono, correo, contrasena = (
-        payload.get("cedula", "").strip(),
-        payload.get("nombre", "").strip(),
-        payload.get("apellido", "").strip(),
-        payload.get("telefono", "").strip(),
-        payload.get("correo", "").strip().lower(),
-        payload.get("contrasena", ""))
-    
+    cedula = payload.get("cedula", "").strip()
+    nombre = payload.get("nombre", "").strip()
+    apellido = payload.get("apellido", "").strip()
+    correo = payload.get("correo", "").strip().lower()
+    contrasena = payload.get("contrasena", "")
+
     if not all([cedula, nombre, apellido, correo, contrasena]):
         return jsonify({"ok": False, "error": "Todos los campos son obligatorios"}), 400
-    hashed = hash_password(contrasena)
-    default_img = "static/uploads/default_icon_profile.png"
-    ahora = datetime.now(timezone.utc).isoformat()
 
     try:
+
+        hashed = hash_password(contrasena)
+        ahora = datetime.now(timezone.utc).isoformat()
         res = supabase.table("usuarios").insert({
             "cedula": cedula,
             "nombre": nombre,
             "apellido": apellido,
-            "telefono": telefono,
+            "telefono": payload.get("telefono", "").strip(),
             "correo": correo,
             "contrasena": hashed,
             "metodo_pago": "Efectivo",
-            "imagen_url": default_img,
-            "ultima_conexion": ahora
-        }).execute()
+            "imagen_url": "static/uploads/default_icon_profile.png",
+            "ultima_conexion": ahora}).execute()
         
         if not res.data:
-            return jsonify({"ok": False, "error": "No se pudo registrar el usuario"}), 400
+            return jsonify({"ok": False, "error": "Error al crear la cuenta"}), 400
         return jsonify({"ok": True, "mensaje": "Usuario Registrado"}), 201
     
     except Exception as e:
@@ -203,46 +194,24 @@ def login():
     if request.method == "GET":
         return render_template("login.html")
     
-    if not request.is_json:
-        return jsonify({"ok": False, "error": "Content-Type application/json requerido"}), 415
     data = request.get_json()
-    
-    if "google_id" in data:
-        correo = data.get("correo", "").strip().lower()
-        res = supabase.table("usuarios").select("*, roles(nombre_role)").eq("correo", correo).execute()
-        
-        if not res.data:
-            return jsonify({"ok": False, "error": "Usuario de Google no registrado"}), 404
-        user = res.data[0]
+    correo = data.get("correo", "").strip().lower()
+    contrasena = data.get("contrasena", "")
+    res = supabase.table("usuarios").select("*, roles(nombre_role)").eq("correo", correo).maybe_single().execute()
 
-    else:
-        correo = data.get("correo", "").strip().lower()
-        contrasena = data.get("contrasena", "")
+    if not res.data or not verify_password(contrasena, res.data["contrasena"]):
+        return jsonify({"ok": False, "error": "Credenciales inválidas"}), 401
 
-        if not correo or not contrasena:
-            return jsonify({"ok": False, "error": "Debes ingresar correo y contraseña"}), 400
-        res = supabase.table("usuarios").select("*, roles(nombre_role)").eq("correo", correo).execute()
-
-        if not res.data:
-            return jsonify({"ok": False, "error": "Correo o contraseña incorrectos"}), 401
-        user = res.data[0]
-
-        if not verify_password(contrasena, user["contrasena"]):
-            return jsonify({"ok": False, "error": "Correo o contraseña incorrectos"}), 401
+    user = res.data
     permisos_res = supabase.table("roles_permisos").select("permisos(nombre_permiso)").eq("id_role", user["id_role"]).execute()
     permisos = [p["permisos"]["nombre_permiso"] for p in permisos_res.data if p.get("permisos")]
+    session.permanent = True
     session["user_id"] = user["id_cliente"]
     session["rol"] = user["roles"]["nombre_role"]
-    session["permisos"] = permisos
     session["user"] = user 
     session["just_logged_in"] = True
-
-    try:
-        ahora = datetime.now(timezone.utc).isoformat()
-        supabase.table("usuarios").update({"ultima_conexion": ahora}).eq("id_cliente", user["id_cliente"]).execute()
-
-    except Exception as e:
-        print(f"Error actualización presencia: {e}")
+    ahora = datetime.now(timezone.utc).isoformat()
+    supabase.table("usuarios").update({"ultima_conexion": ahora}).eq("id_cliente", user["id_cliente"]).execute()
     return jsonify({"ok": True, "redirect": "/inicio", "user": user, "permisos": permisos}), 200
 
 @app.route("/registro-google", methods=["POST"])
@@ -252,69 +221,51 @@ def registro_google():
     token = data.get("token")
     
     try:
-
-        google_verify = requests.get(f"https://oauth2.googleapis.com/tokeninfo?id_token={token}")
         
+        google_verify = requests.get(f"https://oauth2.googleapis.com/tokeninfo?id_token={token}")
+
         if google_verify.status_code != 200:
             return jsonify({"ok": False, "error": "Token no válido"}), 400 
         idinfo = google_verify.json()
-        client_id_env = os.getenv("GOOGLE_CLIENT_ID", "").strip()
 
-        if idinfo["aud"] != client_id_env:
-            return jsonify({"ok": False, "error": "ID de cliente no coincide"}), 400           
+        if idinfo["aud"] != os.getenv("GOOGLE_CLIENT_ID", "").strip():
+            return jsonify({"ok": False, "error": "ID de cliente no coincide"}), 400 
         correo = idinfo['email']
-        res_user = supabase.table("usuarios").select("*, roles(nombre_role)").eq("correo", correo).execute()
         ahora = datetime.now(timezone.utc).isoformat()
+        res_user = supabase.table("usuarios").select("*, roles(nombre_role)").eq("correo", correo).maybe_single().execute()
 
         if res_user.data:
+            user = res_user.data
+            supabase.table("usuarios").update({"ultima_conexion": ahora}).eq("id_cliente", user["id_cliente"]).execute()
 
-            user = res_user.data[0]
-            supabase.table("usuarios").update({"ultima_conexion": ahora}).eq("id_cliente", user["id_cliente"]).execute()          
-            session.permanent = True
-            session["user_id"] = user["id_cliente"]
-            session["user"] = user
-            session["rol"] = user.get("roles", {}).get("nombre_role", "cliente")
+        else:
+
+            nuevo_usuario = {
+                "cedula": f"G-{uuid.uuid4().hex[:8]}",
+                "nombre": idinfo.get('given_name', ''),
+                "apellido": idinfo.get('family_name', ''),
+                "correo": correo,
+                "contrasena": "GOOGLE_AUTH_EXTERNAL",
+                "metodo_pago": "Efectivo",
+                "imagen_url": idinfo.get('picture', "static/uploads/default_icon_profile.png"),
+                "telefono": "",
+                "ultima_conexion": ahora
+            }
             
-            return jsonify({
-                "ok": True, 
-                "mensaje": "Bienvenido", 
-                "redireccion": "/inicio",
-                "user": user}), 200
+            res_insert = supabase.table("usuarios").insert(nuevo_usuario).execute()
+            user_id = res_insert.data[0]["id_cliente"]
+            res_full = supabase.table("usuarios").select("*, roles(nombre_role)").eq("id_cliente", user_id).maybe_single().execute()
+            user = res_full.data
 
-        nuevo_usuario = {
-            "cedula": f"G-{uuid.uuid4().hex[:8]}",
-            "nombre": idinfo.get('given_name', ''),
-            "apellido": idinfo.get('family_name', ''),
-            "correo": correo,
-            "contrasena": "GOOGLE_AUTH_EXTERNAL",
-            "metodo_pago": "Efectivo",
-            "imagen_url": idinfo.get('picture', "static/uploads/default_icon_profile.png"),
-            "telefono": "",
-            "ultima_conexion": ahora
-        }
-        
-        res_insert = supabase.table("usuarios").insert(nuevo_usuario).execute()
-
-        if res_insert.data:
-
-            user = res_insert.data[0]
-            res_user_full = supabase.table("usuarios").select("*, roles(nombre_role)").eq("id_cliente", user["id_cliente"]).execute()
-            user_data = res_user_full.data[0] if res_user_full.data else user
-            session.permanent = True
-            session["user_id"] = user_data["id_cliente"]
-            session["user"] = user_data
-            session["rol"] = user_data.get("roles", {}).get("nombre_role", "cliente")
-            
-            return jsonify({
-                "ok": True, 
-                "mensaje": "Registro exitoso", 
-                "redireccion": "/inicio",
-                "user": user_data}), 201
+        session.permanent = True
+        session["user_id"] = user["id_cliente"]
+        session["user"] = user
+        session["rol"] = user.get("roles", {}).get("nombre_role", "cliente")
+        return jsonify({"ok": True, "redireccion": "/inicio", "user": user}), 200
             
     except Exception as e:
-        print(f"Error en registro_google: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
-
+    
 @app.route("/logout")
 def logout():
 
@@ -1454,7 +1405,7 @@ if __name__ == "__main__":
     port = 8000
     local_ip = get_local_ip()
 
-    debug_mode = False
+    debug_mode = True
 
     if debug_mode:
         print("⚡ Ejecutando en modo DEBUG con servidor de desarrollo de Flask")

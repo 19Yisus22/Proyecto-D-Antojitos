@@ -1,0 +1,65 @@
+body {
+    background-color: #f2dbdb;
+    color: #d6336c;
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.card {
+    width: 400px;
+    max-width: 90%;
+    padding: 2rem;
+    border-radius: 15px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+    background-color: #ffffff;
+    animation: slideIn 0.8s ease forwards;
+    text-align: center;
+}
+
+@keyframes slideIn {
+    0% {
+        transform: translateY(-50px);
+        opacity: 0;
+    }
+    100% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+input.form-control {
+    transition: all 0.3s ease;
+}
+
+input.form-control:focus {
+    border-color: #d6336c;
+    box-shadow: 0 0 5px rgba(214,51,108,0.5);
+}
+
+button.btn {
+    transition: all 0.3s ease;
+}
+
+button.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(214,51,108,0.3);
+}
+
+.logo-container img.logo {
+    width: 60px;
+    height: 60px;
+    margin-bottom: 1rem;
+}
+
+#toastContainer {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 1055;
+}
