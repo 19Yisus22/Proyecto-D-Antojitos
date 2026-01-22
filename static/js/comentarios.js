@@ -55,19 +55,17 @@ function renderComentario(c) {
     
     const info = c.usuario_info || {};
     const foto = info.foto_perfil || 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
-    
     const nombreUsuario = info.nombre_completo || (info.nombre ? `${info.nombre} ${info.apellido || ''}` : 'Usuario desconocido');
-    
     const fecha = new Date(c.created_at).toLocaleString('es-CO', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
     
     const esMiPropioComentario = String(c.id_usuario) === String(usuario.id_usuario);
-    const estaConectado = esMiPropioComentario || c.conectado === true || c.conectado === 1;
+    const estaConectado = info.conectado === true;
     const claseEstado = estaConectado ? 'estado-conectado' : 'estado-desconectado';
 
     div.innerHTML = `
         <div class="d-flex align-items-start">
             <div class="contenedor-foto-estado me-3">
-                <img src="${foto}" class="rounded-circle foto-click border" width="50" height="50" style="object-fit:cover; cursor:pointer;">
+                <img src="${foto}" class="rounded-circle border" width="50" height="50" style="object-fit:cover;">
                 <span class="punto-estado ${claseEstado}"></span>
             </div>
             <div class="flex-grow-1">
@@ -211,17 +209,5 @@ sendBtn.onclick = async () => {
 window.onload = () => {
     cargarComentarios();
     monitorConexion.iniciar();
-    setInterval(cargarComentarios, 3000);
+    setInterval(cargarComentarios, 5000);
 };
-
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/static/js/workers/service-worker-catalogo.js')
-        .then(reg => {
-            console.log('SW registrado correctamente');
-        })
-        .catch(error => {
-            console.error('Error al registrar el SW:', error);
-        });
-    });
-}

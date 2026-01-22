@@ -1187,6 +1187,28 @@ def obtener_comentarios():
         print(f"Error en endpoint comentarios: {e}")
         return jsonify({"error": str(e)}), 500
     
+@app.route("/actualizar_estado_comentarios", methods=["POST"])
+def actualizar_estado_comentarios():
+
+    try:
+        user_id = session.get("user_id")
+
+        if not user_id:
+            return jsonify({"status": "no_auth"}), 401
+        ahora = datetime.now(timezone.utc).isoformat()
+        supabase.table("usuarios")\
+            .update({"ultima_conexion": ahora})\
+            .eq("id_cliente", user_id)\
+            .execute()
+
+        return jsonify({
+            "status": "ok",
+            "last_check": ahora}), 200
+    
+    except Exception as e:
+        print(f"Error crítico en actualizar_estado_comentarios: {e}")
+        return jsonify({"error": "server_error"}), 500
+
 @app.route("/comentarios", methods=["POST"])
 def crear_comentario():
 
@@ -1247,31 +1269,6 @@ def eliminar_comentario(id):
         return jsonify({"error": "No puedes eliminar este comentario"}), 403
     supabase.table("comentarios").delete().eq("id", id).execute()
     return jsonify({"ok": True})
-
-@app.route("/actualizar_estado_comentarios", methods=["POST"])
-def actualizar_estado_comentarios():
-    try:
-        user_id = session.get("user_id")
-
-        if not user_id:
-            return jsonify({"status": "no_auth"}), 401
-
-        ahora = datetime.now(timezone.utc).isoformat()
-        
-        supabase.table("usuarios")\
-            .update({"ultima_conexion": ahora})\
-            .eq("id_cliente", user_id)\
-            .execute()
-
-        return jsonify({
-            "status": "ok",
-            "last_check": ahora
-        }), 200
-    
-    except Exception as e:
-        print(f"Error crítico en actualizar_estado_comentarios: {e}")
-        return jsonify({"error": "server_error"}), 500
-
 
 # APARTADO DE SISTEMA DE PUBLICIDAD
 
