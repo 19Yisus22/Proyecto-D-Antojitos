@@ -1,0 +1,222 @@
+-- 1. EXTENSIONES Y LIMPIEZA
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+DROP TABLE IF EXISTS facturas CASCADE;
+DROP TABLE IF EXISTS comentarios CASCADE;
+DROP TABLE IF EXISTS pedidos CASCADE;
+DROP TABLE IF EXISTS pedido_detalle CASCADE;
+DROP TABLE IF EXISTS carrito CASCADE;
+DROP TABLE IF EXISTS gestion_productos CASCADE;
+DROP TABLE IF EXISTS usuarios CASCADE;
+DROP TABLE IF EXISTS roles_permisos CASCADE;
+DROP TABLE IF EXISTS permisos CASCADE;
+DROP TABLE IF EXISTS roles CASCADE;
+DROP TABLE IF EXISTS publicidad CASCADE;
+
+-- 2. ESTRUCTURA DE TABLAS
+CREATE TABLE roles (
+    id_role UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nombre_role TEXT UNIQUE NOT NULL CHECK (nombre_role IN ('admin','cliente','visitante')),
+    descripcion TEXT
+);
+
+CREATE TABLE permisos (
+    id_permiso UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nombre_permiso TEXT UNIQUE NOT NULL,
+    descripcion TEXT
+);
+
+CREATE TABLE roles_permisos (
+    id_role UUID REFERENCES roles(id_role) ON DELETE CASCADE,
+    id_permiso UUID REFERENCES permisos(id_permiso) ON DELETE CASCADE,
+    PRIMARY KEY (id_role, id_permiso)
+);
+
+CREATE TABLE usuarios (
+    id_cliente UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- Ajustado para permitir registros manuales
+    imagen_url TEXT DEFAULT 'static/uploads/default_icon_profile.png',
+    nombre TEXT NOT NULL,
+    apellido TEXT NOT NULL,
+    telefono TEXT,
+    correo TEXT UNIQUE NOT NULL,
+    contrasena TEXT,
+    id_role UUID REFERENCES roles(id_role),
+    direccion TEXT,
+    cedula TEXT UNIQUE,
+    metodo_pago TEXT CHECK (metodo_pago IN ('Efectivo','Transferencia')) DEFAULT 'Efectivo',
+    fecha_creacion TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    ultima_conexion TIMESTAMP WITH TIME ZONE
+);
+
+CREATE TABLE gestion_productos (
+    id_producto UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nombre TEXT NOT NULL,
+    descripcion TEXT,
+    precio NUMERIC(12,2) NOT NULL,
+    stock INT NOT NULL DEFAULT 0,
+    imagen_url TEXT,
+    categoria TEXT DEFAULT 'Postre',
+    fecha_creacion TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    estado BOOLEAN DEFAULT TRUE
+);
+
+CREATE TABLE carrito (
+    id_carrito UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_cliente UUID REFERENCES usuarios(id_cliente) ON DELETE CASCADE,
+    id_producto UUID REFERENCES gestion_productos(id_producto) ON DELETE CASCADE,
+    nombre_producto TEXT,
+    cantidad INT NOT NULL CHECK (cantidad > 0),
+    precio_unitario NUMERIC(12,2) NOT NULL,
+    total NUMERIC(12,2) NOT NULL,
+    fecha_creacion TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE pedidos (
+    id_pedido UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_cliente UUID REFERENCES usuarios(id_cliente) ON DELETE CASCADE,
+    direccion_entrega TEXT NOT NULL,
+    metodo_pago TEXT CHECK (metodo_pago IN ('Efectivo','Transferencia')),
+    estado TEXT NOT NULL DEFAULT 'Pendiente' CHECK (estado IN ('Pendiente','Enviado','Entregado','Cancelado')),
+    pagado BOOLEAN DEFAULT FALSE,
+    fecha_pedido TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    total NUMERIC(12,2) NOT NULL
+);
+
+CREATE TABLE facturas (
+    id_factura UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_pedido UUID REFERENCES pedidos(id_pedido) ON DELETE CASCADE,
+    id_cliente UUID REFERENCES usuarios(id_cliente) ON DELETE CASCADE,
+    numero_factura SERIAL UNIQUE,
+    fecha_emision TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    subtotal NUMERIC(12,2) NOT NULL,
+    total NUMERIC(12,2) NOT NULL,
+    metodo_pago TEXT CHECK (metodo_pago IN ('Efectivo','Transferencia')),
+    estado TEXT DEFAULT 'Emitida' CHECK (estado IN ('Emitida','Anulada','Pagada')),
+    cedula TEXT
+);
+
+CREATE TABLE pedido_detalle (
+    id_detalle UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_pedido UUID REFERENCES pedidos(id_pedido) ON DELETE CASCADE,
+    id_producto UUID REFERENCES gestion_productos(id_producto) ON DELETE RESTRICT,
+    nombre_producto TEXT NOT NULL,
+    cantidad INT NOT NULL CHECK (cantidad > 0),
+    precio_unitario NUMERIC(12,2) NOT NULL CHECK (precio_unitario >= 0),
+    subtotal NUMERIC(12,2) NOT NULL
+);
+
+CREATE TABLE comentarios (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_usuario UUID REFERENCES usuarios(id_cliente) ON DELETE CASCADE,
+    nombre_usuario TEXT NOT NULL,
+    correo_usuario TEXT NOT NULL,
+    foto_perfil TEXT,
+    mensaje TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE publicidad (
+    id_publicidad UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    titulo TEXT NOT NULL,
+    subtitulo TEXT,
+    img JSONB DEFAULT '[]'::jsonb,
+    tipo TEXT CHECK (tipo IN ('notificacion', 'carrusel', 'seccion', 'general')),
+    titulo_publicidad TEXT,
+    descripcion_publicidad TEXT,
+    estado BOOLEAN DEFAULT TRUE,
+    fecha_creacion TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 3. ACTIVAR RLS
+ALTER TABLE roles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE permisos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE roles_permisos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE usuarios ENABLE ROW LEVEL SECURITY;
+ALTER TABLE gestion_productos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE carrito ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pedidos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE facturas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pedido_detalle ENABLE ROW LEVEL SECURITY;
+ALTER TABLE comentarios ENABLE ROW LEVEL SECURITY;
+ALTER TABLE publicidad ENABLE ROW LEVEL SECURITY;
+
+-- 4. FUNCIONES SEGURAS CON SEARCH_PATH
+CREATE OR REPLACE FUNCTION public.asignar_rol_cliente()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.id_role IS NULL THEN
+        NEW.id_role := (SELECT id_role FROM public.roles WHERE nombre_role='cliente' LIMIT 1);
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+CREATE OR REPLACE FUNCTION public.handle_user_login()
+RETURNS TRIGGER AS $$
+DECLARE
+    default_role_id UUID;
+BEGIN
+    SELECT id_role INTO default_role_id FROM public.roles WHERE nombre_role = 'cliente' LIMIT 1;
+
+    INSERT INTO public.usuarios (id_cliente, correo, nombre, apellido, imagen_url, id_role, cedula, contrasena)
+    VALUES (
+        NEW.id,
+        NEW.email,
+        COALESCE(NEW.raw_user_meta_data->>'given_name', NEW.raw_user_meta_data->>'nombre', 'Usuario'),
+        COALESCE(NEW.raw_user_meta_data->>'family_name', NEW.raw_user_meta_data->>'apellido', 'Google'),
+        COALESCE(NEW.raw_user_meta_data->>'picture', 'static/uploads/default_icon_profile.png'),
+        default_role_id,
+        COALESCE(NEW.raw_user_meta_data->>'cedula', 'G-' || SUBSTR(NEW.id::text, 1, 8)),
+        'GOOGLE_AUTH_EXTERNAL'
+    )
+    ON CONFLICT (id_cliente) DO UPDATE SET
+        ultima_conexion = NOW(),
+        imagen_url = COALESCE(NEW.raw_user_meta_data->>'picture', public.usuarios.imagen_url);
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- 5. TRIGGERS
+DROP TRIGGER IF EXISTS trg_asignar_rol_cliente ON public.usuarios;
+CREATE TRIGGER trg_asignar_rol_cliente
+BEFORE INSERT ON public.usuarios
+FOR EACH ROW EXECUTE FUNCTION asignar_rol_cliente();
+
+DROP TRIGGER IF EXISTS on_auth_user_login ON auth.users;
+CREATE TRIGGER on_auth_user_login
+AFTER UPDATE OF last_sign_in_at ON auth.users
+FOR EACH ROW
+WHEN (OLD.last_sign_in_at IS DISTINCT FROM NEW.last_sign_in_at)
+EXECUTE FUNCTION public.handle_user_login();
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+AFTER INSERT ON auth.users
+FOR EACH ROW
+EXECUTE FUNCTION public.handle_user_login();
+
+-- 6. POLÍTICAS RLS MEJORADAS
+CREATE POLICY "Inserción perfiles" ON usuarios FOR INSERT WITH CHECK (true);
+CREATE POLICY "Lectura pública perfiles" ON usuarios FOR SELECT USING (true);
+CREATE POLICY "Edición propia" ON usuarios FOR UPDATE USING (auth.uid() = id_cliente);
+
+CREATE POLICY "Ver productos" ON gestion_productos FOR SELECT USING (true);
+CREATE POLICY "Admin productos" ON gestion_productos FOR ALL 
+USING (EXISTS (SELECT 1 FROM usuarios WHERE id_cliente = auth.uid() AND id_role = (SELECT id_role FROM roles WHERE nombre_role = 'admin')));
+
+CREATE POLICY "Carrito propio" ON carrito FOR ALL USING (id_cliente = auth.uid());
+CREATE POLICY "Pedidos propios" ON pedidos FOR ALL USING (id_cliente = auth.uid());
+CREATE POLICY "Detalles pedidos propios" ON pedido_detalle FOR SELECT 
+USING (EXISTS (SELECT 1 FROM pedidos WHERE id_pedido = pedido_detalle.id_pedido AND id_cliente = auth.uid()));
+
+CREATE POLICY "Ver publicidad" ON publicidad FOR SELECT USING (estado = true);
+CREATE POLICY "Admin publicidad" ON publicidad FOR ALL 
+USING (EXISTS (SELECT 1 FROM usuarios WHERE id_cliente = auth.uid() AND id_role = (SELECT id_role FROM roles WHERE nombre_role = 'admin')));
+
+-- 7. DATOS INICIALES
+INSERT INTO roles (nombre_role, descripcion) VALUES 
+('cliente', 'Acceso estándar'),
+('admin', 'Administrador total'),
+('visitante', 'Solo lectura')
+ON CONFLICT (nombre_role) DO NOTHING;

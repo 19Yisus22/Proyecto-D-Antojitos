@@ -24,6 +24,7 @@ SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 
 if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
     raise ValueError("Faltan las credenciales de Supabase en el archivo .env")
+
 supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME")
@@ -33,6 +34,7 @@ CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 
 if not CLOUDINARY_CLOUD_NAME or not CLOUDINARY_API_KEY or not CLOUDINARY_API_SECRET:
     raise ValueError("Faltan las credenciales de Cloudinary en el archivo .env")
+
 cloudinary.config(cloud_name=CLOUDINARY_CLOUD_NAME, api_key=CLOUDINARY_API_KEY, api_secret=CLOUDINARY_API_SECRET)
 
 FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY") or secrets.token_hex(24)
@@ -42,7 +44,6 @@ app.secret_key = FLASK_SECRET_KEY
 CORS(app, supports_credentials=True)
 logging.getLogger('waitress').setLevel(logging.ERROR)
 
-# CONFIGURACIÓN PARA SUBIDA DE ARCHIVOS
 UPLOAD_FOLDER = 'uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'ico'}
@@ -52,55 +53,39 @@ def allowed_file(filename):
     return ext in ALLOWED_EXTENSIONS
 
 def upload_image_to_cloudinary(file, folder="mi_app", public_id=None):
-
     if not public_id:
         public_id = secrets.token_hex(8)
     result = cloudinary.uploader.upload(file, folder=folder, public_id=public_id, overwrite=True, resource_type="image")
     return result.get("secure_url")
 
 def delete_image_from_cloudinary(public_url):
-
     parts = public_url.split("/")[-2:]
     public_id = "/".join(parts).split(".")[0]
-
     try:
         cloudinary.uploader.destroy(public_id, resource_type="image")
         return True
-    
     except:
         return False
 
 def hash_password(contrasena, salt=None):
-
     if not salt:
         salt = os.urandom(16).hex()
     hashed = hashlib.sha256((salt + contrasena).encode()).hexdigest()
     return f"{salt}${hashed}"
 
 def verify_password(contrasena, hashed):
-    salt, hash_val = hashed.split("$")
-    return hashlib.sha256((salt + contrasena).encode()).hexdigest() == hash_val
-
-def login_usuario(correo, contrasena):
-    res = supabase.table("usuarios").select("*, roles(nombre_role), roles_permisos(permisos(nombre_permiso))").eq("correo", correo).execute()
-
-    if not res.data:
-        return None
-    user = res.data[0]
-
-    if not verify_password(contrasena, user["contrasena"]):
-        return None
-    return user
+    try:
+        salt, hash_val = hashed.split("$")
+        return hashlib.sha256((salt + contrasena).encode()).hexdigest() == hash_val
+    except:
+        return False
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-
     if request.method == "POST":
-
         if "file" not in request.files or request.files["file"].filename == "":
             return render_template("inicio.html", mensaje="No se seleccionó archivo")
         file = request.files["file"]
-
         if file and allowed_file(file.filename):
             url_imagen = upload_image_to_cloudinary(file, folder="uploads")
             return render_template("inicio.html", mensaje="Archivo subido correctamente", url_imagen=url_imagen)
@@ -109,9 +94,7 @@ def index():
 
 @app.route("/obtener-cliente-id", methods=["GET"])
 def obtener_cliente_id():
-    
     cliente_id = os.getenv("GOOGLE_CLIENT_ID", "").strip()
-
     if not cliente_id:
         return jsonify({"error": "Falta Cliente de Google Auth"}), 500
     return jsonify({"client_id": cliente_id})
@@ -122,37 +105,42 @@ def agregar_cabeceras(response):
     response.headers['Cross-Origin-Resource-Policy'] = 'cross-origin'
     return response
 
-# APARTADO DE AUTENTICACIÓN
-
 @app.route("/inicio")
 def inicio():
-
     user_id = session.get("user_id")
-
     if not user_id:
         session.clear()
         return render_template("inicio.html", user=None)
-    res = supabase.table("usuarios").select("*, roles(nombre_role)").eq("id_cliente", user_id).maybe_single().execute()
 
-    if not res.data:
-        session.clear()
+    try:
+        res = supabase.table("usuarios").select("*, roles(nombre_role)").eq("id_cliente", user_id).maybe_single().execute()
+        
+        if res is None or not res.data:
+            session.clear()
+            return render_template("inicio.html", user=None)
+
+        user = res.data
+        session["user"] = user
+        just_logged_in = session.pop("just_logged_in", False)
+        
+        permisos_res = supabase.table("roles_permisos").select("permisos(nombre_permiso)").eq("id_role", user.get("id_role")).execute()
+        user["permisos"] = []
+        if permisos_res and permisos_res.data:
+            user["permisos"] = [p["permisos"]["nombre_permiso"] for p in permisos_res.data if p.get("permisos")]
+        
+        pedidos_nuevos = False
+        if user.get("roles", {}).get("nombre_role") == "admin":
+            pedidos_res = supabase.table("pedidos").select("id_pedido").eq("estado", "nuevo").limit(1).execute()
+            if pedidos_res and pedidos_res.data:
+                pedidos_nuevos = bool(pedidos_res.data)
+
+        return render_template("inicio.html", user=user, just_logged_in=just_logged_in, pedidos_nuevos=pedidos_nuevos)
+    except Exception as e:
+        print(f"Error en /inicio: {e}")
         return render_template("inicio.html", user=None)
-
-    user = res.data
-    session["user"] = user
-    just_logged_in = session.pop("just_logged_in", False)
-    permisos_res = supabase.table("roles_permisos").select("permisos(nombre_permiso)").eq("id_role", user.get("id_role")).execute()
-    user["permisos"] = [p["permisos"]["nombre_permiso"] for p in permisos_res.data if p.get("permisos")]
-    pedidos_nuevos = False
-
-    if user.get("roles", {}).get("nombre_role") == "admin":
-        pedidos_res = supabase.table("pedidos").select("id_pedido").eq("estado", "nuevo").limit(1).execute()
-        pedidos_nuevos = bool(pedidos_res.data)
-    return render_template("inicio.html", user=user, just_logged_in=just_logged_in, pedidos_nuevos=pedidos_nuevos)
 
 @app.route("/registro", methods=["GET", "POST"])
 def registro():
-
     if request.method == "GET":
         return render_template("registro.html")
     
@@ -167,7 +155,6 @@ def registro():
         return jsonify({"ok": False, "error": "Todos los campos son obligatorios"}), 400
 
     try:
-
         hashed = hash_password(contrasena)
         ahora = datetime.now(timezone.utc).isoformat()
         res = supabase.table("usuarios").insert({
@@ -179,67 +166,66 @@ def registro():
             "contrasena": hashed,
             "metodo_pago": "Efectivo",
             "imagen_url": "static/uploads/default_icon_profile.png",
-            "ultima_conexion": ahora}).execute()
+            "ultima_conexion": ahora
+        }).execute()
         
         if not res.data:
             return jsonify({"ok": False, "error": "Error al crear la cuenta"}), 400
         return jsonify({"ok": True, "mensaje": "Usuario Registrado"}), 201
-    
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 400
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-
     if request.method == "GET":
         return render_template("login.html")
     
     data = request.get_json()
     correo = data.get("correo", "").strip().lower()
     contrasena = data.get("contrasena", "")
-    res = supabase.table("usuarios").select("*, roles(nombre_role)").eq("correo", correo).maybe_single().execute()
+    
+    try:
+        res = supabase.table("usuarios").select("*, roles(nombre_role)").eq("correo", correo).maybe_single().execute()
+        if not res or not res.data or not verify_password(contrasena, res.data["contrasena"]):
+            return jsonify({"ok": False, "error": "Credenciales inválidas"}), 401
 
-    if not res.data or not verify_password(contrasena, res.data["contrasena"]):
-        return jsonify({"ok": False, "error": "Credenciales inválidas"}), 401
-
-    user = res.data
-    permisos_res = supabase.table("roles_permisos").select("permisos(nombre_permiso)").eq("id_role", user["id_role"]).execute()
-    permisos = [p["permisos"]["nombre_permiso"] for p in permisos_res.data if p.get("permisos")]
-    session.permanent = True
-    session["user_id"] = user["id_cliente"]
-    session["rol"] = user["roles"]["nombre_role"]
-    session["user"] = user 
-    session["just_logged_in"] = True
-    ahora = datetime.now(timezone.utc).isoformat()
-    supabase.table("usuarios").update({"ultima_conexion": ahora}).eq("id_cliente", user["id_cliente"]).execute()
-    return jsonify({"ok": True, "redirect": "/inicio", "user": user, "permisos": permisos}), 200
+        user = res.data
+        permisos_res = supabase.table("roles_permisos").select("permisos(nombre_permiso)").eq("id_role", user["id_role"]).execute()
+        permisos = [p["permisos"]["nombre_permiso"] for p in permisos_res.data if p.get("permisos")]
+        
+        session.permanent = True
+        session["user_id"] = user["id_cliente"]
+        session["rol"] = user["roles"]["nombre_role"]
+        session["user"] = user 
+        session["just_logged_in"] = True
+        
+        ahora = datetime.now(timezone.utc).isoformat()
+        supabase.table("usuarios").update({"ultima_conexion": ahora}).eq("id_cliente", user["id_cliente"]).execute()
+        return jsonify({"ok": True, "redirect": "/inicio", "user": user, "permisos": permisos}), 200
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 @app.route("/registro-google", methods=["POST"])
 def registro_google():
-
     data = request.get_json()
     token = data.get("token")
-    
     try:
-        
         google_verify = requests.get(f"https://oauth2.googleapis.com/tokeninfo?id_token={token}")
-
         if google_verify.status_code != 200:
             return jsonify({"ok": False, "error": "Token no válido"}), 400 
+        
         idinfo = google_verify.json()
-
         if idinfo["aud"] != os.getenv("GOOGLE_CLIENT_ID", "").strip():
             return jsonify({"ok": False, "error": "ID de cliente no coincide"}), 400 
+
         correo = idinfo['email']
         ahora = datetime.now(timezone.utc).isoformat()
         res_user = supabase.table("usuarios").select("*, roles(nombre_role)").eq("correo", correo).maybe_single().execute()
 
-        if res_user.data:
+        if res_user and res_user.data:
             user = res_user.data
             supabase.table("usuarios").update({"ultima_conexion": ahora}).eq("id_cliente", user["id_cliente"]).execute()
-
         else:
-
             nuevo_usuario = {
                 "cedula": f"G-{uuid.uuid4().hex[:8]}",
                 "nombre": idinfo.get('given_name', ''),
@@ -251,7 +237,6 @@ def registro_google():
                 "telefono": "",
                 "ultima_conexion": ahora
             }
-            
             res_insert = supabase.table("usuarios").insert(nuevo_usuario).execute()
             user_id = res_insert.data[0]["id_cliente"]
             res_full = supabase.table("usuarios").select("*, roles(nombre_role)").eq("id_cliente", user_id).maybe_single().execute()
@@ -262,26 +247,20 @@ def registro_google():
         session["user"] = user
         session["rol"] = user.get("roles", {}).get("nombre_role", "cliente")
         return jsonify({"ok": True, "redireccion": "/inicio", "user": user}), 200
-            
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
     
 @app.route("/logout")
 def logout():
-
     user_id = session.get("user_id")
-
     if user_id:
         fecha_desconectado = "2000-01-01T00:00:00Z"
-
         try:
             supabase.table("usuarios").update({"ultima_conexion": fecha_desconectado}).eq("id_cliente", user_id).execute()
-
         except:
             pass
     session.clear()
     return redirect("/login")
-
 
 # APARTADO DE PERFILES
 
