@@ -6,6 +6,29 @@ let editandoComentario = null;
 let comentariosActuales = []; 
 const usuario = {id_usuario: window.userId};
 
+const monitorConexion = {
+    intervalo: null,
+    frecuencia: 30000, 
+
+    iniciar() {
+        if (!usuario.id_usuario) return;
+        this.enviarSenal();
+        this.intervalo = setInterval(() => this.enviarSenal(), this.frecuencia);
+    },
+
+    async enviarSenal() {
+        try {
+            const url = "/actualizar_estado_comentarios";
+            await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+        } catch (e) {
+            console.error("Error de presencia:", e);
+        }
+    }
+};
+
 function showMessage(msg, isError = false) {
     const toast = document.createElement('div');
     toast.className = 'custom-toast';
@@ -30,12 +53,15 @@ function renderComentario(c) {
     div.className = "message position-relative shadow-sm border rounded-4 p-3 mb-3 bg-white";
     div.id = `msg-${c.id}`;
     
-    const foto = c.usuario_info?.foto_perfil || 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
-    const nombre = c.usuario_info?.nombre_usuario || 'Usuario';
+    const info = c.usuario_info || {};
+    const foto = info.foto_perfil || 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
+    
+    const nombreUsuario = info.nombre_completo || (info.nombre ? `${info.nombre} ${info.apellido || ''}` : 'Usuario desconocido');
+    
     const fecha = new Date(c.created_at).toLocaleString('es-CO', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
     
-    const esMiPropioComentario = c.id_usuario === usuario.id_usuario;
-    const estaConectado = c.usuario_info?.conectado === true;
+    const esMiPropioComentario = String(c.id_usuario) === String(usuario.id_usuario);
+    const estaConectado = esMiPropioComentario || c.conectado === true || c.conectado === 1;
     const claseEstado = estaConectado ? 'estado-conectado' : 'estado-desconectado';
 
     div.innerHTML = `
@@ -46,7 +72,7 @@ function renderComentario(c) {
             </div>
             <div class="flex-grow-1">
                 <div class="d-flex justify-content-between align-items-center mb-1">
-                    <span class="fw-bold text-primary" style="font-size:0.95rem;">${nombre}</span>
+                    <span class="fw-bold text-primary" style="font-size:0.95rem;">${nombreUsuario}</span>
                     <div class="d-flex align-items-center">
                         <span class="text-muted small me-2">${fecha}</span>
                         ${esMiPropioComentario ? `
@@ -62,41 +88,32 @@ function renderComentario(c) {
     `;
 
     if(esMiPropioComentario) {
-        div.querySelector(".btn-options").onclick = (e) => {
-            e.stopPropagation();
-            document.querySelectorAll(".comentario-dropdown").forEach(d => d.remove());
-            
-            const dd = document.createElement("ul");
-            dd.className = "list-group position-absolute shadow-lg comentario-dropdown";
-            dd.style.zIndex = "2000";
-            
-            dd.innerHTML = `
-                <li class="list-group-item list-group-item-action border-0 py-2 px-3" style="cursor:pointer; font-size: 0.9rem;">
-                    <i class="bi bi-pencil me-2 text-primary"></i>Editar
-                </li>
-                <li class="list-group-item list-group-item-action border-0 py-2 px-3 text-danger" style="cursor:pointer; font-size: 0.9rem;">
-                    <i class="bi bi-trash me-2"></i>Eliminar
-                </li>
-            `;
-            
-            const rect = e.target.getBoundingClientRect();
-            dd.style.position = "fixed";
-            dd.style.top = `${rect.bottom + 5}px`;
-            dd.style.left = `${rect.left - 100}px`;
-            
-            dd.querySelectorAll("li")[0].onclick = () => {
-                iniciarEdicion(c.id, c.mensaje);
-                dd.remove();
+        const btnOpt = div.querySelector(".btn-options");
+        if(btnOpt) {
+            btnOpt.onclick = (e) => {
+                e.stopPropagation();
+                document.querySelectorAll(".comentario-dropdown").forEach(d => d.remove());
+                const dd = document.createElement("ul");
+                dd.className = "list-group position-absolute shadow-lg comentario-dropdown";
+                dd.style.zIndex = "2000";
+                dd.innerHTML = `
+                    <li class="list-group-item list-group-item-action border-0 py-2 px-3" style="cursor:pointer; font-size: 0.9rem;">
+                        <i class="bi bi-pencil me-2 text-primary"></i>Editar
+                    </li>
+                    <li class="list-group-item list-group-item-action border-0 py-2 px-3 text-danger" style="cursor:pointer; font-size: 0.9rem;">
+                        <i class="bi bi-trash me-2"></i>Eliminar
+                    </li>
+                `;
+                const rect = e.target.getBoundingClientRect();
+                dd.style.position = "fixed";
+                dd.style.top = `${rect.bottom + 5}px`;
+                dd.style.left = `${rect.left - 100}px`;
+                dd.querySelectorAll("li")[0].onclick = () => { iniciarEdicion(c.id, c.mensaje); dd.remove(); };
+                dd.querySelectorAll("li")[1].onclick = () => { ejecutarEliminacionDirecta(c.id); dd.remove(); };
+                document.body.appendChild(dd);
+                document.addEventListener("click", () => dd.remove(), {once:true});
             };
-            
-            dd.querySelectorAll("li")[1].onclick = () => {
-                ejecutarEliminacionDirecta(c.id);
-                dd.remove();
-            };
-            
-            document.body.appendChild(dd);
-            document.addEventListener("click", () => dd.remove(), {once:true});
-        };
+        }
     }
     return div;
 }
@@ -117,7 +134,7 @@ async function cargarComentarios() {
             chatBox.scrollTop = chatBox.scrollHeight;
         }
     } catch(e) { 
-        console.error("Error al sincronizar comentarios:", e); 
+        console.error("Error al sincronizar:", e); 
     }
 }
 
@@ -193,6 +210,7 @@ sendBtn.onclick = async () => {
 
 window.onload = () => {
     cargarComentarios();
+    monitorConexion.iniciar();
     setInterval(cargarComentarios, 3000);
 };
 

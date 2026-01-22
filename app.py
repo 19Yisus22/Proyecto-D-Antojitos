@@ -107,6 +107,23 @@ def index():
         return render_template("inicio.html", mensaje="Extensión de archivo no permitida")
     return render_template("inicio.html")
 
+@app.route("/obtener-cliente-id", methods=["GET"])
+def obtener_cliente_id():
+
+    cliente_id = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+
+    if not cliente_id:
+        return jsonify({"error": "Variable de entorno no configurada"}), 500
+    return jsonify({"client_id": cliente_id})
+
+@app.after_request
+def agregar_cabeceras(response):
+    
+    response.headers['Cross-Origin-Opener-Policy'] = 'same-origin-allow-popups'
+    response.headers['Cross-Origin-Resource-Policy'] = 'cross-origin'
+    return response
+
+
 # APARTADO DE AUTENTICACIÓN
 
 @app.route("/inicio")
@@ -146,7 +163,6 @@ def registro():
     if not request.is_json:
         return jsonify({"ok": False, "error": "Content-Type application/json requerido"}), 415
     payload = request.get_json()
-
     cedula, nombre, apellido, telefono, correo, contrasena = (
         payload.get("cedula", "").strip(),
         payload.get("nombre", "").strip(),
@@ -159,9 +175,9 @@ def registro():
         return jsonify({"ok": False, "error": "Todos los campos son obligatorios"}), 400
     hashed = hash_password(contrasena)
     default_img = "static/uploads/default_icon_profile.png"
+    ahora = datetime.now(timezone.utc).isoformat()
 
     try:
-        
         res = supabase.table("usuarios").insert({
             "cedula": cedula,
             "nombre": nombre,
@@ -170,7 +186,9 @@ def registro():
             "correo": correo,
             "contrasena": hashed,
             "metodo_pago": "Efectivo",
-            "imagen_url": default_img}).execute()
+            "imagen_url": default_img,
+            "ultima_conexion": ahora
+        }).execute()
         
         if not res.data:
             return jsonify({"ok": False, "error": "No se pudo registrar el usuario"}), 400
@@ -188,19 +206,29 @@ def login():
     if not request.is_json:
         return jsonify({"ok": False, "error": "Content-Type application/json requerido"}), 415
     data = request.get_json()
-    correo = data.get("correo", "").strip().lower()
-    contrasena = data.get("contrasena", "")
+    
+    if "google_id" in data:
+        correo = data.get("correo", "").strip().lower()
+        res = supabase.table("usuarios").select("*, roles(nombre_role)").eq("correo", correo).execute()
+        
+        if not res.data:
+            return jsonify({"ok": False, "error": "Usuario de Google no registrado"}), 404
+        user = res.data[0]
 
-    if not correo or not contrasena:
-        return jsonify({"ok": False, "error": "Debes ingresar correo y contraseña"}), 400
-    res = supabase.table("usuarios").select("*, roles(nombre_role)").eq("correo", correo).execute()
+    else:
+        correo = data.get("correo", "").strip().lower()
+        contrasena = data.get("contrasena", "")
 
-    if not res.data:
-        return jsonify({"ok": False, "error": "Correo o contraseña incorrectos"}), 401
-    user = res.data[0]
+        if not correo or not contrasena:
+            return jsonify({"ok": False, "error": "Debes ingresar correo y contraseña"}), 400
+        res = supabase.table("usuarios").select("*, roles(nombre_role)").eq("correo", correo).execute()
 
-    if not verify_password(contrasena, user["contrasena"]):
-        return jsonify({"ok": False, "error": "Correo o contraseña incorrectos"}), 401
+        if not res.data:
+            return jsonify({"ok": False, "error": "Correo o contraseña incorrectos"}), 401
+        user = res.data[0]
+
+        if not verify_password(contrasena, user["contrasena"]):
+            return jsonify({"ok": False, "error": "Correo o contraseña incorrectos"}), 401
     permisos_res = supabase.table("roles_permisos").select("permisos(nombre_permiso)").eq("id_role", user["id_role"]).execute()
     permisos = [p["permisos"]["nombre_permiso"] for p in permisos_res.data if p.get("permisos")]
     session["user_id"] = user["id_cliente"]
@@ -208,23 +236,14 @@ def login():
     session["permisos"] = permisos
     session["user"] = user 
     session["just_logged_in"] = True
+
+    try:
+        ahora = datetime.now(timezone.utc).isoformat()
+        supabase.table("usuarios").update({"ultima_conexion": ahora}).eq("id_cliente", user["id_cliente"]).execute()
+
+    except Exception as e:
+        print(f"Error actualización presencia: {e}")
     return jsonify({"ok": True, "redirect": "/inicio", "user": user, "permisos": permisos}), 200
-
-@app.route("/obtener-cliente-id", methods=["GET"])
-def obtener_cliente_id():
-
-    cliente_id = os.getenv("GOOGLE_CLIENT_ID", "").strip()
-
-    if not cliente_id:
-        return jsonify({"error": "Variable de entorno no configurada"}), 500
-    return jsonify({"client_id": cliente_id})
-
-@app.after_request
-def agregar_cabeceras(response):
-    
-    response.headers['Cross-Origin-Opener-Policy'] = 'same-origin-allow-popups'
-    response.headers['Cross-Origin-Resource-Policy'] = 'cross-origin'
-    return response
 
 @app.route("/registro-google", methods=["POST"])
 def registro_google():
@@ -242,16 +261,20 @@ def registro_google():
         client_id_env = os.getenv("GOOGLE_CLIENT_ID", "").strip()
 
         if idinfo["aud"] != client_id_env:
-            return jsonify({"ok": False, "error": "ID de cliente no coincide"}), 400
+            return jsonify({"ok": False, "error": "ID de cliente no coincide"}), 400           
         correo = idinfo['email']
         res_user = supabase.table("usuarios").select("*, roles(nombre_role)").eq("correo", correo).execute()
+        ahora = datetime.now(timezone.utc).isoformat()
 
         if res_user.data:
+
             user = res_user.data[0]
+            supabase.table("usuarios").update({"ultima_conexion": ahora}).eq("id_cliente", user["id_cliente"]).execute()          
             session.permanent = True
             session["user_id"] = user["id_cliente"]
             session["user"] = user
             session["rol"] = user.get("roles", {}).get("nombre_role", "cliente")
+            
             return jsonify({
                 "ok": True, 
                 "mensaje": "Bienvenido", 
@@ -266,7 +289,8 @@ def registro_google():
             "contrasena": "GOOGLE_AUTH_EXTERNAL",
             "metodo_pago": "Efectivo",
             "imagen_url": idinfo.get('picture', "static/uploads/default_icon_profile.png"),
-            "telefono": ""
+            "telefono": "",
+            "ultima_conexion": ahora
         }
         
         res_insert = supabase.table("usuarios").insert(nuevo_usuario).execute()
@@ -276,7 +300,6 @@ def registro_google():
             user = res_insert.data[0]
             res_user_full = supabase.table("usuarios").select("*, roles(nombre_role)").eq("id_cliente", user["id_cliente"]).execute()
             user_data = res_user_full.data[0] if res_user_full.data else user
-            
             session.permanent = True
             session["user_id"] = user_data["id_cliente"]
             session["user"] = user_data
@@ -289,13 +312,24 @@ def registro_google():
                 "user": user_data}), 201
             
     except Exception as e:
+        print(f"Error en registro_google: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
-    
+
 @app.route("/logout")
 def logout():
 
+    user_id = session.get("user_id")
+
+    if user_id:
+        fecha_desconectado = "2000-01-01T00:00:00Z"
+
+        try:
+            supabase.table("usuarios").update({"ultima_conexion": fecha_desconectado}).eq("id_cliente", user_id).execute()
+
+        except:
+            pass
     session.clear()
-    return redirect(url_for('index'))
+    return redirect("/login")
 
 
 # APARTADO DE PERFILES
@@ -1107,6 +1141,7 @@ def comentarios_page():
 def obtener_comentarios():
 
     try:
+
         comentarios_res = supabase.table("comentarios").select("*").order("created_at", desc=False).execute()
         comentarios = comentarios_res.data or []
         usuarios_res = supabase.table("usuarios").select("id_cliente,nombre,apellido,imagen_url,ultima_conexion").execute()
@@ -1121,22 +1156,25 @@ def obtener_comentarios():
             if ultima_con:
                 try:
                     fecha_con = datetime.fromisoformat(ultima_con.replace('Z', '+00:00'))
-                    
                     if (ahora - fecha_con).total_seconds() < 60:
                         esta_conectado = True
                 except Exception:
                     esta_conectado = False
 
             usuarios_dict[u["id_cliente"]] = {
-                "nombre_usuario": f"{u['nombre']} {u['apellido']}".strip(),
+                "nombre": u.get("nombre", ""),
+                "apellido": u.get("apellido", ""),
                 "foto_perfil": u.get("imagen_url"),
-                "conectado": esta_conectado}
+                "conectado": esta_conectado
+            }
 
         for c in comentarios:
             info = usuarios_dict.get(c["id_usuario"], {
-                "nombre_usuario": "Usuario", 
+                "nombre": "Usuario", 
+                "apellido": "Desconocido", 
                 "foto_perfil": None, 
-                "conectado": False})
+                "conectado": False
+            })
             
             c["usuario_info"] = info
             
@@ -1148,7 +1186,7 @@ def obtener_comentarios():
     except Exception as e:
         print(f"Error en endpoint comentarios: {e}")
         return jsonify({"error": str(e)}), 500
-
+    
 @app.route("/comentarios", methods=["POST"])
 def crear_comentario():
 
@@ -1212,19 +1250,26 @@ def eliminar_comentario(id):
 
 @app.route("/actualizar_estado_comentarios", methods=["POST"])
 def actualizar_estado_comentarios():
-
     try:
-
         user_id = session.get("user_id")
 
-        if user_id:
-            ahora = datetime.now(timezone.utc).isoformat()
-            supabase.table("usuarios").update({"ultima_conexion": ahora}).eq("id_cliente", user_id).execute()
-            return jsonify({"status": "ok"}), 200
-        return jsonify({"status": "no_auth"}), 401
+        if not user_id:
+            return jsonify({"status": "no_auth"}), 401
+
+        ahora = datetime.now(timezone.utc).isoformat()
+        
+        supabase.table("usuarios")\
+            .update({"ultima_conexion": ahora})\
+            .eq("id_cliente", user_id)\
+            .execute()
+
+        return jsonify({
+            "status": "ok",
+            "last_check": ahora
+        }), 200
     
     except Exception as e:
-        print(f"Error en actualizar_estado_comentarios: {e}")
+        print(f"Error crítico en actualizar_estado_comentarios: {e}")
         return jsonify({"error": "server_error"}), 500
 
 
@@ -1412,7 +1457,7 @@ if __name__ == "__main__":
     port = 8000
     local_ip = get_local_ip()
 
-    debug_mode = True
+    debug_mode = False
 
     if debug_mode:
         print("⚡ Ejecutando en modo DEBUG con servidor de desarrollo de Flask")

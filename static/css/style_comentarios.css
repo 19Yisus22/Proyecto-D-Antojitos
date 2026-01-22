@@ -19,18 +19,20 @@ body {
 
 main {
     flex: 1;
+    display: flex;
+    flex-direction: column;
 }
 
 .chat-container {
     width: 95%;
     max-width: 750px;
-    margin: 20px auto;
+    margin: 10px auto;
     background: #f8f9fa;
     border-radius: 20px;
     box-shadow: 0 10px 30px var(--shadow);
     display: flex;
     flex-direction: column;
-    height: 75vh;
+    height: 80vh;
 }
 
 #chatBox {
@@ -152,8 +154,9 @@ main {
     background: var(--dark);
     color: var(--white);
     border-radius: 12px;
-    padding: 16px 24px;
-    min-width: 280px;
+    padding: 12px 20px;
+    min-width: 250px;
+    max-width: 90%;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -214,4 +217,37 @@ footer, .footer {
     border-top: 1px solid rgba(255,255,255,0.2);
     padding-top: 10px;
     font-size: 0.9rem;
+}
+
+@media (max-width: 768px) {
+    .chat-container {
+        width: 100%;
+        height: calc(100vh - 120px);
+        margin: 0;
+        border-radius: 0;
+    }
+
+    .message {
+        padding: 10px;
+        margin-bottom: 10px;
+        border-radius: 12px;
+    }
+
+    .contenedor-foto-estado img {
+        width: 40px;
+        height: 40px;
+    }
+
+    .punto-estado {
+        width: 12px;
+        height: 12px;
+    }
+
+    .custom-toast {
+        min-width: auto;
+        width: 95%;
+        left: 2.5%;
+        padding: 10px 15px;
+        font-size: 0.85rem;
+    }
 }
