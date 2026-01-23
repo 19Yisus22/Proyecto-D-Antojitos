@@ -202,7 +202,7 @@ def logout():
         except:
             pass
     session.clear()
-    return redirect("/login")
+    return redirect("/inicio")
 
 # APARTADO DE PERFILES
 
