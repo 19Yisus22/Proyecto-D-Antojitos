@@ -1,4 +1,3 @@
--- 1. EXTENSIONES Y LIMPIEZA
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 DROP TABLE IF EXISTS facturas CASCADE;
@@ -13,7 +12,6 @@ DROP TABLE IF EXISTS permisos CASCADE;
 DROP TABLE IF EXISTS roles CASCADE;
 DROP TABLE IF EXISTS publicidad CASCADE;
 
--- 2. ESTRUCTURA DE TABLAS
 CREATE TABLE roles (
     id_role UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nombre_role TEXT UNIQUE NOT NULL CHECK (nombre_role IN ('admin','cliente','visitante')),
@@ -33,7 +31,7 @@ CREATE TABLE roles_permisos (
 );
 
 CREATE TABLE usuarios (
-    id_cliente UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- Ajustado para permitir registros manuales
+    id_cliente UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     imagen_url TEXT DEFAULT 'static/uploads/default_icon_profile.png',
     nombre TEXT NOT NULL,
     apellido TEXT NOT NULL,
@@ -117,17 +115,14 @@ CREATE TABLE comentarios (
 
 CREATE TABLE publicidad (
     id_publicidad UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    titulo TEXT NOT NULL,
-    subtitulo TEXT,
-    img JSONB DEFAULT '[]'::jsonb,
-    tipo TEXT CHECK (tipo IN ('notificacion', 'carrusel', 'seccion', 'general')),
-    titulo_publicidad TEXT,
-    descripcion_publicidad TEXT,
+    tipo TEXT NOT NULL CHECK (tipo IN ('carrusel', 'seccion', 'notificacion', 'cinta')),
+    titulo TEXT,
+    descripcion TEXT,
+    imagen_url TEXT,
     estado BOOLEAN DEFAULT TRUE,
     fecha_creacion TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 3. ACTIVAR RLS
 ALTER TABLE roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE permisos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE roles_permisos ENABLE ROW LEVEL SECURITY;
@@ -140,7 +135,25 @@ ALTER TABLE pedido_detalle ENABLE ROW LEVEL SECURITY;
 ALTER TABLE comentarios ENABLE ROW LEVEL SECURITY;
 ALTER TABLE publicidad ENABLE ROW LEVEL SECURITY;
 
--- 4. FUNCIONES SEGURAS CON SEARCH_PATH
+CREATE OR REPLACE FUNCTION public.es_admin()
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM public.usuarios
+        WHERE id_cliente = auth.uid()
+        AND id_role = (SELECT id_role FROM public.roles WHERE nombre_role = 'admin' LIMIT 1)
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+CREATE OR REPLACE FUNCTION public.actualizar_ultima_conexion()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.ultima_conexion = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
 CREATE OR REPLACE FUNCTION public.asignar_rol_cliente()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -157,8 +170,7 @@ DECLARE
     default_role_id UUID;
 BEGIN
     SELECT id_role INTO default_role_id FROM public.roles WHERE nombre_role = 'cliente' LIMIT 1;
-
-    INSERT INTO public.usuarios (id_cliente, correo, nombre, apellido, imagen_url, id_role, cedula, contrasena)
+    INSERT INTO public.usuarios (id_cliente, correo, nombre, apellido, imagen_url, id_role, cedula, telefono, direccion, contrasena)
     VALUES (
         NEW.id,
         NEW.email,
@@ -167,17 +179,26 @@ BEGIN
         COALESCE(NEW.raw_user_meta_data->>'picture', 'static/uploads/default_icon_profile.png'),
         default_role_id,
         COALESCE(NEW.raw_user_meta_data->>'cedula', 'G-' || SUBSTR(NEW.id::text, 1, 8)),
+        COALESCE(NEW.raw_user_meta_data->>'phone', NEW.raw_user_meta_data->>'telefono', ''),
+        COALESCE(NEW.raw_user_meta_data->>'address', NEW.raw_user_meta_data->>'direccion', ''),
         'GOOGLE_AUTH_EXTERNAL'
     )
     ON CONFLICT (id_cliente) DO UPDATE SET
         ultima_conexion = NOW(),
-        imagen_url = COALESCE(NEW.raw_user_meta_data->>'picture', public.usuarios.imagen_url);
-    
+        imagen_url = COALESCE(NEW.raw_user_meta_data->>'picture', public.usuarios.imagen_url),
+        telefono = COALESCE(NEW.raw_user_meta_data->>'phone', NEW.raw_user_meta_data->>'telefono', public.usuarios.telefono),
+        direccion = COALESCE(NEW.raw_user_meta_data->>'address', NEW.raw_user_meta_data->>'direccion', public.usuarios.direccion);
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
--- 5. TRIGGERS
+DROP TRIGGER IF EXISTS trg_actualizar_conexion ON public.usuarios;
+CREATE TRIGGER trg_actualizar_conexion
+BEFORE UPDATE ON public.usuarios
+FOR EACH ROW
+WHEN (OLD.* IS DISTINCT FROM NEW.*)
+EXECUTE FUNCTION actualizar_ultima_conexion();
+
 DROP TRIGGER IF EXISTS trg_asignar_rol_cliente ON public.usuarios;
 CREATE TRIGGER trg_asignar_rol_cliente
 BEFORE INSERT ON public.usuarios
@@ -186,35 +207,62 @@ FOR EACH ROW EXECUTE FUNCTION asignar_rol_cliente();
 DROP TRIGGER IF EXISTS on_auth_user_login ON auth.users;
 CREATE TRIGGER on_auth_user_login
 AFTER UPDATE OF last_sign_in_at ON auth.users
-FOR EACH ROW
-WHEN (OLD.last_sign_in_at IS DISTINCT FROM NEW.last_sign_in_at)
+FOR EACH ROW WHEN (OLD.last_sign_in_at IS DISTINCT FROM NEW.last_sign_in_at)
 EXECUTE FUNCTION public.handle_user_login();
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
 AFTER INSERT ON auth.users
-FOR EACH ROW
-EXECUTE FUNCTION public.handle_user_login();
+FOR EACH ROW EXECUTE FUNCTION public.handle_user_login();
 
--- 6. POLÍTICAS RLS MEJORADAS
-CREATE POLICY "Inserción perfiles" ON usuarios FOR INSERT WITH CHECK (true);
 CREATE POLICY "Lectura pública perfiles" ON usuarios FOR SELECT USING (true);
-CREATE POLICY "Edición propia" ON usuarios FOR UPDATE USING (auth.uid() = id_cliente);
+CREATE POLICY "Inserción perfiles" ON usuarios FOR INSERT WITH CHECK (auth.uid() = id_cliente OR auth.role() = 'service_role');
+CREATE POLICY "Edición propia y admin" ON usuarios FOR UPDATE 
+USING (auth.uid() = id_cliente OR public.es_admin())
+WITH CHECK (
+    (auth.uid() = id_cliente AND id_role = (SELECT id_role FROM usuarios WHERE id_cliente = auth.uid())) 
+    OR public.es_admin()
+);
 
 CREATE POLICY "Ver productos" ON gestion_productos FOR SELECT USING (true);
-CREATE POLICY "Admin productos" ON gestion_productos FOR ALL 
-USING (EXISTS (SELECT 1 FROM usuarios WHERE id_cliente = auth.uid() AND id_role = (SELECT id_role FROM roles WHERE nombre_role = 'admin')));
+CREATE POLICY "Admin productos" ON gestion_productos FOR ALL USING (public.es_admin() OR auth.role() = 'service_role');
 
-CREATE POLICY "Carrito propio" ON carrito FOR ALL USING (id_cliente = auth.uid());
-CREATE POLICY "Pedidos propios" ON pedidos FOR ALL USING (id_cliente = auth.uid());
-CREATE POLICY "Detalles pedidos propios" ON pedido_detalle FOR SELECT 
-USING (EXISTS (SELECT 1 FROM pedidos WHERE id_pedido = pedido_detalle.id_pedido AND id_cliente = auth.uid()));
+CREATE POLICY "Admin CRUD carrito" ON carrito FOR ALL USING (public.es_admin());
+CREATE POLICY "Cliente CRUD limitado carrito" ON carrito FOR ALL 
+USING (id_cliente = auth.uid())
+WITH CHECK (id_cliente = auth.uid());
 
-CREATE POLICY "Ver publicidad" ON publicidad FOR SELECT USING (estado = true);
-CREATE POLICY "Admin publicidad" ON publicidad FOR ALL 
-USING (EXISTS (SELECT 1 FROM usuarios WHERE id_cliente = auth.uid() AND id_role = (SELECT id_role FROM roles WHERE nombre_role = 'admin')));
+CREATE POLICY "Admin CRUD pedidos" ON pedidos FOR ALL USING (public.es_admin());
+CREATE POLICY "Cliente ver pedidos" ON pedidos FOR SELECT USING (id_cliente = auth.uid());
 
--- 7. DATOS INICIALES
+CREATE POLICY "Admin CRUD facturas" ON facturas FOR ALL USING (public.es_admin());
+CREATE POLICY "Cliente ver facturas" ON facturas FOR SELECT USING (id_cliente = auth.uid());
+
+CREATE POLICY "Admin CRUD detalle" ON pedido_detalle FOR ALL USING (public.es_admin());
+CREATE POLICY "Cliente CRUD detalle" ON pedido_detalle FOR ALL 
+USING (EXISTS (SELECT 1 FROM pedidos WHERE id_pedido = pedido_detalle.id_pedido AND id_cliente = auth.uid()))
+WITH CHECK (
+    public.es_admin() OR (
+        id_pedido IN (SELECT id_pedido FROM pedidos WHERE id_cliente = auth.uid())
+    )
+);
+
+CREATE POLICY "CRUD comentarios" ON comentarios FOR ALL USING (auth.uid() IS NOT NULL);
+
+CREATE POLICY "Admin CRUD publicidad" 
+ON publicidad 
+FOR ALL 
+TO authenticated
+USING (public.es_admin())
+WITH CHECK (public.es_admin());
+
+CREATE POLICY "Publico ver publicidad activa" 
+ON publicidad 
+FOR SELECT 
+USING (estado = true);
+
+CREATE INDEX idx_publicidad_tipo_estado ON publicidad(tipo, estado);
+
 INSERT INTO roles (nombre_role, descripcion) VALUES 
 ('cliente', 'Acceso estándar'),
 ('admin', 'Administrador total'),

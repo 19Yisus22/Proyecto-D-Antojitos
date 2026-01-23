@@ -1,10 +1,12 @@
-const CACHE_NAME = 'dantojitos-v1';
+const CACHE_NAME = 'dantojitos-v2';
 const ASSETS = [
     '/',
     '/catalogo_page',
     '/static/css/style_catalogo.css',
     '/static/js/catalogo.js',
+    '/static/js/inicio.js',
     '/static/uploads/logo.ico',
+    '/static/uploads/googlogo.ico',
     'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css',
     'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css',
     'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js'
@@ -13,8 +15,11 @@ const ASSETS = [
 const EXCLUDED_PATHS = [
     '/obtener_catalogo',
     '/obtener_carrito',
+    '/api/publicidad/activa',
+    '/api/publicidad/actualizar',
     '/api/admin/notificaciones',
-    '/guardar_catalogo'
+    '/guardar_catalogo',
+    '/api/configuracion'
 ];
 
 self.addEventListener('install', event => {
@@ -40,14 +45,16 @@ self.addEventListener('fetch', event => {
     if (event.request.method !== 'GET') return;
 
     const url = new URL(event.request.url);
+    const isExcluded = EXCLUDED_PATHS.some(path => url.pathname.includes(path));
 
-    if (EXCLUDED_PATHS.some(path => url.pathname.includes(path))) {
+    if (isExcluded) {
         event.respondWith(
             fetch(event.request).catch(() => {
                 return new Response(JSON.stringify({ 
-                    error: "Sin conexión", 
+                    error: true,
+                    status: "offline",
                     productos: [], 
-                    message: "Estás operando en modo desconectado." 
+                    message: "Sin conexión al servidor." 
                 }), {
                     headers: { 'Content-Type': 'application/json' }
                 });
@@ -58,8 +65,12 @@ self.addEventListener('fetch', event => {
 
     event.respondWith(
         caches.match(event.request).then(cachedResponse => {
-            const fetchPromise = fetch(event.request).then(networkResponse => {
-                if (networkResponse && networkResponse.status === 200) {
+            if (cachedResponse) {
+                return cachedResponse;
+            }
+
+            return fetch(event.request).then(networkResponse => {
+                if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
                     const responseToCache = networkResponse.clone();
                     caches.open(CACHE_NAME).then(cache => {
                         cache.put(event.request, responseToCache);
@@ -70,10 +81,7 @@ self.addEventListener('fetch', event => {
                 if (event.request.mode === 'navigate') {
                     return caches.match('/catalogo_page') || caches.match('/');
                 }
-                return cachedResponse;
             });
-
-            return cachedResponse || fetchPromise;
         })
     );
 });
@@ -96,7 +104,7 @@ async function enviarCarritoPendiente() {
                     await cache.delete(request);
                 }
             } catch (err) {
-                console.error("Fallo sincronización", err);
+                console.error(err);
             }
         })
     );

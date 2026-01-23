@@ -195,31 +195,38 @@ h2 {
     transform: scale(1.2);
 }
 
-.footer-container {
-    margin-top: auto;
-}
-
-.footer {
+footer, .footer {
+    flex-shrink: 0;
     background-color: #000;
     color: #fff;
-    padding: 20px 0;
-    flex-shrink: 0;
-}
-
-.footer a:hover {
-    color: #ffd1dc;
-}
-
-.app-badge {
-    display: inline-block;
-    width: 3cm;
-    height: 3cm;
+    padding: 40px 0 20px 0;
+    margin-top: auto;
+    border-top: 4px solid var(--primary-color, #d35400);
 }
 
 .footer-bottom {
-    border-top: 1px solid rgba(255,255,255,0.2);
-    padding-top: 10px;
-    font-size: 0.9rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 15px;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.footer h5 {
+    color: var(--primary-color, #d35400);
+    font-weight: 700;
+    margin-bottom: 20px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.footer a {
+    color: rgba(255, 255, 255, 0.8);
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.footer a:hover {
+    color: var(--primary-color, #d35400);
 }
 
 .icono {

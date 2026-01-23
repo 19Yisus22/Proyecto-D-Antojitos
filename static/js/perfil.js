@@ -319,11 +319,7 @@ document.addEventListener("DOMContentLoaded", () => {
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/static/js/workers/service-worker-perfil.js')
-        .then(reg => {
-            console.log('SW registrado correctamente');
-        })
-        .catch(error => {
-            console.error('Error al registrar el SW:', error);
-        });
+        .then(reg => { console.log('SW OK'); })
+        .catch(err => { console.error('SW Error', err); });
     });
 }

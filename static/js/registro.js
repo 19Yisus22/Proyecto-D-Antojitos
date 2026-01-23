@@ -157,12 +157,8 @@ if (linkInicio) {
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/static/js/workers/service-worker-registro.js')
-        .then(reg => {
-            console.log('SW registrado correctamente');
-        })
-        .catch(error => {
-            console.error('Error al registrar el SW:', error);
-        });
+        navigator.serviceWorker.register('/static/js/workers/service-worker-publicidad.js')
+        .then(reg => { console.log('SW OK'); })
+        .catch(err => { console.error('SW Error', err); });
     });
 }

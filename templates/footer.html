@@ -10,6 +10,7 @@
         <div class="info-item"><i class="bi bi-clock-fill"></i> Horarios de atención: Viernes a Domingo - Festivos a partir de las 9:00 AM - 6:00 PM</div>
         
         {% if request.path == '/catalogo_page' or request.path == '/carrito_page' %}
+
         <div class="info-item">
           <i class="bi bi-cash-coin"></i> Transferencias Bancarias:
           <ul class="list-unstyled ms-3 mt-2">
@@ -19,7 +20,11 @@
             <li><img src="{{ url_for('static', filename='uploads/nu.logo.png') }}" alt="Nu" width="20" class="me-2"> Nu - 3115699825</li>
           </ul>
         </div>
+
         {% endif %}
+
+        <div class="info-item"><i class="bi bi-person-fill"></i> Created By: 2022 Yisus™ - Todos los derechos reservados</div>
+        
       </div>
 
       <div class="footer-section">
@@ -36,8 +41,8 @@
     </div>
 
     <div class="text-center mt-3 footer-bottom">
+      <p>_______________________________________________________________________________________________________</p>
       <p>2025 D'Antojitos © - Todos los derechos reservados</p>
-      <p>2022 Yisus™ - Todos los derechos reservados</p>
     </div>
   </footer>
 </div>

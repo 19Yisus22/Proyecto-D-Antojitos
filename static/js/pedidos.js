@@ -164,6 +164,7 @@ async function cargarPedidos(isAutoRefresh = false) {
     try {
         const res = await fetch("/obtener_pedidos");
         const pedidos = await res.json();
+        
         if (!Array.isArray(pedidos)) return;
 
         pedidosDatosRaw = pedidos;
@@ -642,12 +643,8 @@ setInterval(() => cargarPedidos(true), 15000);
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/static/js/workers/service-worker-catalogo.js')
-        .then(reg => {
-            console.log('SW registrado correctamente');
-        })
-        .catch(error => {
-            console.error('Error al registrar el SW:', error);
-        });
+        navigator.serviceWorker.register('/static/js/workers/service-worker-pedidos.js')
+        .then(reg => { console.log('SW OK'); })
+        .catch(err => { console.error('SW Error', err); });
     });
 }

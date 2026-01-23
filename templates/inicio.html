@@ -14,23 +14,63 @@
 
 {% include 'navbar.html' %}
 
-<div class="container mt-4">
+<div class="container mt-5">
+    <div class="catalog-header text-center mb-5 fade-in">
+        <h1 class="display-4 fw-bold" style="color: #1a1a1a; letter-spacing: -1px;">
+            Bienvenid@ a D'Antojitos{% if session.get('user') %} - {{ session.user.nombre }}{% endif %}
+        </h1>
+        <div class="divider mx-auto" style="background-color: #d35400;"></div>
+        
+        <p class="text-muted" id="mensajeBienvenidaDinamico">Endulza tu día con deliciosos postres caseros!!</p>
+
+        {% if session.get('user') and session.user.rol == 'admin' %}
+
+        <div class="admin-edit-zone mx-auto mb-4" style="max-width: 500px; margin-top: 15px;">
+            <div class="input-group input-group-sm shadow-sm">
+                <input type="text" id="inputMensajeAdmin" class="form-control border-warning" placeholder="Nuevo mensaje de bienvenida...">
+                <button class="btn btn-warning fw-bold" onclick="actualizarMensajeBienvenida()">
+                    <i class="bi bi-save2 me-1"></i> Actualizar
+                </button>
+            </div>
+        </div>
+        
+        {% endif %}
+        {% if not session.get('user') %}
+
+        <div class="d-flex flex-column flex-md-row justify-content-center gap-3 mt-4">
+            <a href="/login" class="btn btn-outline-dark px-4 py-2 rounded-pill fw-bold">
+                <i class="bi bi-envelope-at me-2"></i> Iniciar con Correo
+            </a>
+            <a href="/login" class="btn btn-white border shadow-sm px-4 py-2 rounded-pill fw-bold" style="background: white;">
+                <img src="{{ url_for('static', filename='uploads/googlogo.ico') }}" width="18" height="18" class="me-2" alt="Google">
+                Iniciar con Google
+            </a>
+        </div>
+
+        {% endif %}
+
+    </div>
+
     <div class="row g-4">
         <div class="col-lg-8">
-            <h1 class="fw-bold">Bienvenid@ a D'Antojitos{% if session.get('user') %} - {{ session.user.nombre }}{% endif %}</h1>
-            <section id="vision">
-                <h3 class="mb-3">Nuestra historia y pasión</h3>
+            <section id="vision" class="fade-in">
+                <div class="d-flex flex-column mb-4 align-items-start">
+                    <h3 class="fw-bold h5 text-uppercase" style="letter-spacing: 1px; color: #1a1a1a;">Nuestra historia y pasión</h3>
+                    <div class="divider" style="width: 40px; height: 3px; margin-top: 5px; background-color: #d6336c; margin-left: 0;"></div>
+                </div>
+
                 <div class="carousel-container-custom">
-                    <div id="carouselPromo" class="carousel slide carousel-fade" data-bs-ride="carousel" data-bs-interval="3000">
+                    <div id="carouselPromo" class="carousel slide carousel-fade" data-bs-ride="carousel">
                         <div class="carousel-inner" id="carouselItems"></div>
                         <button class="carousel-control-prev" type="button" data-bs-target="#carouselPromo" data-bs-slide="prev">
-                            <span class="carousel-control-prev-icon" style="filter: invert(1); opacity: 0.5;"></span>
+                            <span class="carousel-control-prev-icon" style="filter: invert(1); opacity: 0.7;"></span>
                         </button>
                         <button class="carousel-control-next" type="button" data-bs-target="#carouselPromo" data-bs-slide="next">
-                            <span class="carousel-control-next-icon" style="filter: invert(1); opacity: 0.5;"></span>
+                            <span class="carousel-control-next-icon" style="filter: invert(1); opacity: 0.7;"></span>
                         </button>
                     </div>
                 </div>
+
                 <div class="mt-4">
                     <p class="descripcion-postre">
                         Le damos la bienvenida a <strong>D'Antojitos</strong>, un espacio donde la pasión por la repostería se convierte en experiencias inolvidables. Nuestro emprendimiento nace del amor por los sabores auténticos y la creatividad en cada detalle, transformando ingredientes frescos y de la más alta calidad en postres que deleitan tanto la vista como el paladar.
@@ -49,72 +89,41 @@
         </div>
 
         <div class="col-lg-4">
-            <div id="seccionesAlFrente" class="row g-3"></div>
-            
-            <div class="sidebar-custom mt-4">
-                <h5 class="mb-4 fw-bold" style="color: #333; border-left: 4px solid #d6336c; padding-left: 10px;">Explorar</h5>
-                
+            <div id="seccionesAlFrente" class="d-flex flex-column gap-3 mb-4"></div>
+            <div class="sidebar-custom fade-in">
+                <h5 class="mb-4 fw-bold" style="color: #333; border-left: 4px solid #d35400; padding-left: 10px;">Explorar</h5>
                 <a href="/catalogo_page" class="nav-card">
-                    <i class="bi bi-shop"></i>
+                    <i class="bi bi-shop me-3"></i>
                     <div>
                         <span>Catálogo de Dulces</span>
                         <small>Explora nuestros postres frescos</small>
                     </div>
                 </a>
-
                 <a href="/carrito_page" class="nav-card">
-                    <div id="cartDot" class="cart-dot"></div>
-                    <i class="bi bi-cart3"></i>
+                    <i class="bi bi-cart3 me-3"></i>
                     <div>
                         <span>Mi Carrito</span>
                         <small>Revisa tus pedidos seleccionados</small>
                     </div>
                 </a>
-
                 <a href="/comentarios_page" class="nav-card">
-                    <i class="bi bi-chat-heart"></i>
+                    <i class="bi bi-chat-heart me-3"></i>
                     <div>
                         <span>Tu Opinión</span>
                         <small>Comentarios y sugerencias</small>
                     </div>
                 </a>
-
-                {% if not session.get('user') %}
-                <div class="pt-2">
-                    <hr class="opacity-10">
-                    <a href="/login" class="btn-login-container">
-                        <img src="{{ url_for('static', filename='uploads/googlogo.ico') }}" alt="Google" style="width: 20px; height: 20px;">
-                        <span style="color: rgba(255,255,255,0.7); font-size: 0.75rem;">Google</span>
-                        <div style="width: 1px; height: 15px; background: rgba(255,255,255,0.2);"></div>
-                        <i class="bi bi-envelope-fill" style="font-size: 1rem;"></i>
-                        <span style="color: rgba(255,255,255,0.7); font-size: 0.75rem;">Correo</span>
-                    </a>
-                </div>
-                {% endif %}
             </div>
         </div>
     </div>
-    <div class="row mt-5 g-4 justify-content-center" id="seccionesDebajo"></div>
+    <div class="row mt-5 g-4 justify-content-start fade-in" id="seccionesDebajo"></div>
 </div>
 
-<div id="toastContainer"></div>
+<div id="toastContainer" class="position-fixed bottom-0 start-0 p-3" style="z-index: 1100;"></div>
 
 {% include 'footer.html' %}
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-    window.userLogged = "{{ 'true' if session.get('user') else 'false' }}" === "true";
-
-    function updateCartNotification() {
-        const cart = JSON.parse(sessionStorage.getItem('cart')) || [];
-        const dot = document.getElementById('cartDot');
-        if (dot) {
-            dot.style.display = cart.length > 0 ? 'block' : 'none';
-        }
-    }
-    document.addEventListener('DOMContentLoaded', updateCartNotification);
-</script>
 <script src="{{ url_for('static', filename='js/inicio.js') }}"></script>
-
 </body>
 </html>

@@ -1,270 +1,177 @@
-let carruselIndex = 0, seccionIndex = 0;
-let carruselUrls = {}, seccionesUrls = {};
+let carruselIndex = 0, seccionIndex = 0, cintaIndex = 0;
 let procesamientoEnCurso = false;
 
 function toast(msg, tipo = "success") {
+    const container = document.getElementById("toastContainer");
+    if (!container) return;
     const div = document.createElement("div");
-    div.className = `toast align-items-center text-bg-${tipo} border-0 show`;
-    div.innerHTML = `<div class="d-flex"><div class="toast-body">${msg}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>`;
-    document.getElementById("toastContainer").appendChild(div);
-    setTimeout(() => div.remove(), 3000);
-}
-
-function showConfirmToast(msg, callback) {
-    const container = document.getElementById('toastContainer');
-    const toast = document.createElement('div');
-    toast.className = 'toast align-items-center text-bg-warning border-0 show';
-    toast.style.minWidth = "300px";
-    toast.innerHTML = `
-        <div class="d-flex flex-column p-2">
-            <div class="d-flex align-items-center mb-2">
-                <i class="bi bi-exclamation-triangle me-2"></i>
-                <span class="fw-bold">${msg}</span>
-            </div>
-            <div class="d-flex justify-content-end gap-2">
-                <button class="btn btn-sm btn-outline-secondary btn-cancel">Cancelar</button>
-                <button class="btn btn-sm btn-danger btn-confirm">Confirmar</button>
-            </div>
+    div.className = "custom-toast";
+    let icon = tipo === "success" ? "bi-check-circle-fill" : (tipo === "warning" ? "bi-exclamation-circle-fill" : "bi-exclamation-triangle-fill");
+    let iconColor = tipo === "success" ? "#2ecc71" : (tipo === "warning" ? "#f1c40f" : "#e74c3c");
+    div.innerHTML = `
+        <div class="d-flex align-items-center gap-3">
+            <i class="bi ${icon}" style="color: ${iconColor}; font-size: 1.2rem;"></i>
+            <span class="fw-bold small">${msg}</span>
         </div>
+        <button type="button" class="btn-close btn-close-white ms-3" style="font-size: 0.7rem;"></button>
     `;
-    container.appendChild(toast);
-
-    const remove = () => {
-        toast.classList.remove('show');
-        setTimeout(() => toast.remove(), 300);
+    const closeBtn = div.querySelector(".btn-close");
+    closeBtn.onclick = () => {
+        div.style.opacity = "0";
+        setTimeout(() => div.remove(), 400);
     };
-
-    toast.querySelector('.btn-cancel').onclick = remove;
-    toast.querySelector('.btn-confirm').onclick = () => {
-        callback();
-        remove();
-    };
-}
-
-document.getElementById("archivoNotificacion").addEventListener("change", e => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const r = new FileReader();
-    r.onload = ev => {
-        document.getElementById("previewNotificacionImg").src = ev.target.result;
-        document.getElementById("previewNotificacion").style.display = "block";
-    };
-    r.readAsDataURL(file);
-});
-
-async function crearNotificacion() {
-    if (procesamientoEnCurso) {
-        toast("Por favor espere, procesando solicitud anterior...", "warning");
-        return;
-    }
-
-    const fileInput = document.getElementById("archivoNotificacion");
-    const titulo = document.getElementById("tituloNotificacion").value.trim();
-    const desc = document.getElementById("descNotificacion").value.trim();
-    if (!titulo || !desc) { toast("Complete los campos", "warning"); return; }
-    
-    procesamientoEnCurso = true;
-    const btn = event.target;
-    const textoOriginal = btn.innerText;
-    btn.disabled = true;
-    btn.innerText = "Procesando...";
-
-    const formData = new FormData();
-    formData.append("titulo", titulo);
-    formData.append("descripcion", desc);
-    if (fileInput.files[0]) formData.append("archivo", fileInput.files[0]);
-    
-    fetch("/api/admin/notificaciones", { method: "POST", body: formData }).then(r => r.json()).then(d => {
-        toast(d.msg);
-        fileInput.value = "";
-        document.getElementById("previewNotificacion").style.display = "none";
-        document.getElementById("tituloNotificacion").value = "";
-        document.getElementById("descNotificacion").value = "";
-        cargarAlertas();
-    }).finally(() => {
-        procesamientoEnCurso = false;
-        btn.disabled = false;
-        btn.innerText = textoOriginal;
-    });
-}
-
-function cargarAlertas() {
-    fetch("/api/admin/notificaciones").then(r => r.json()).then(data => {
-        const cont = document.getElementById("contenedorAlertas");
-        cont.innerHTML = "";
-        data.forEach(a => {
-            const div = document.createElement("div");
-            div.className = "notificacion-item";
-            div.innerHTML = `
-      <img src="${a.imagen_url || ''}" class="notificacion-img-actual" style="width:80px; height:80px; object-fit:cover; border-radius:5px;">
-      <div class="flex-grow-1 notificacion-vista"><strong>${a.titulo}</strong><br><span>${a.descripcion}</span></div>
-      <div class="flex-grow-1 notificacion-editar" style="display:none;">
-        <input type="text" class="form-control mb-1 edit-titulo" value="${a.titulo}">
-        <input type="text" class="form-control mb-1 edit-desc" value="${a.descripcion}">
-        <input type="file" class="form-control edit-img" onchange="previewImagenNotificacion(this)">
-      </div>
-      <div class="d-flex flex-column gap-2">
-        <button class="btn btn-sm btn-warning btn-editar" onclick="toggleEditarNotificacion(this)">Editar</button>
-        <button class="btn btn-sm btn-success btn-guardar" style="display:none;" onclick="guardarEdicionNotificacion(this,'${a.id_notificacion}')">OK</button>
-        <button class="btn btn-sm btn-danger" onclick="eliminarNotificacion('${a.id_notificacion}',this.closest('.notificacion-item'))">X</button>
-      </div>`;
-            cont.appendChild(div);
-        });
-    });
-}
-
-function previewImagenNotificacion(input) {
-    const file = input.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = e => {
-            input.closest('.notificacion-item').querySelector('.notificacion-img-actual').src = e.target.result;
-        };
-        reader.readAsDataURL(file);
-    }
-}
-
-function toggleEditarNotificacion(btn) {
-    const item = btn.closest('.notificacion-item');
-    item.querySelector('.notificacion-vista').style.display = 'none';
-    item.querySelector('.notificacion-editar').style.display = 'block';
-    btn.style.display = 'none';
-    item.querySelector('.btn-guardar').style.display = 'block';
-}
-
-async function guardarEdicionNotificacion(btn, id) {
-    if (procesamientoEnCurso) {
-        toast("Por favor espere, procesando solicitud anterior...", "warning");
-        return;
-    }
-
-    procesamientoEnCurso = true;
-    const textoOriginal = btn.innerText;
-    btn.disabled = true;
-    btn.innerText = "...";
-
-    const item = btn.closest('.notificacion-item');
-    const formData = new FormData();
-    formData.append("titulo", item.querySelector('.edit-titulo').value);
-    formData.append("descripcion", item.querySelector('.edit-desc').value);
-    const file = item.querySelector('.edit-img').files[0];
-    if (file) formData.append("archivo", file);
-    
-    fetch(`/api/admin/notificaciones/${id}`, { method: "PUT", body: formData })
-    .then(r => r.json())
-    .then(d => {
-        if(d.ok) {
-            toast("Notificación actualizada");
-            cargarAlertas();
-        } else {
-            toast(d.error || "Error al actualizar", "danger");
+    container.appendChild(div);
+    setTimeout(() => {
+        if (div.parentNode) {
+            div.style.opacity = "0";
+            setTimeout(() => div.remove(), 400);
         }
-    }).finally(() => {
-        procesamientoEnCurso = false;
-        btn.disabled = false;
-        btn.innerText = textoOriginal;
-    });
+    }, 4000);
 }
 
-function eliminarNotificacion(id, el) {
-    if (procesamientoEnCurso) {
-        toast("Por favor espere, procesando solicitud anterior...", "warning");
-        return;
+function validarArchivo(file) {
+    if (!file) return false;
+    const extensionesPermitidas = /(\.jpg|\.jpeg|\.png|\.webp|\.gif|\.avif)$/i;
+    if (!extensionesPermitidas.exec(file.name)) {
+        toast("Formato no soportado. Use JPG, PNG, WEBP, GIF o AVIF", "danger");
+        return false;
     }
-
-    showConfirmToast("¿Eliminar esta notificación definitivamente?", () => {
-        procesamientoEnCurso = true;
-        fetch(`/api/admin/notificaciones/${id}`, { method: "DELETE" })
-        .then(r => r.json())
-        .then(d => {
-            if(d.ok) {
-                toast("Notificación eliminada");
-                el.remove();
-            }
-        }).finally(() => {
-            procesamientoEnCurso = false;
-        });
-    });
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+        toast("La imagen es demasiado pesada (Máximo 10MB)", "danger");
+        return false;
+    }
+    return true;
 }
 
-function agregarCarrusel(url = "", titulo = "", desc = "") {
+function agregarCarrusel(url = "", titulo = "", desc = "", id = "") {
     const idx = carruselIndex++;
-    if (url) carruselUrls[idx] = url;
     const div = document.createElement("div");
-    div.className = "section-preview";
+    div.className = "col-12 section-preview mb-4";
+    div.draggable = true;
     div.dataset.index = idx;
-    div.innerHTML = `<div class="d-flex gap-3">
-    <div><div class="preview-img-box"><img src="${url || ''}"></div><input type="file" class="form-control form-control-sm" onchange="cambioImg(this,'carrusel',${idx})"></div>
-    <div class="flex-grow-1">
-      <input type="text" class="form-control mb-2 t-tit" placeholder="Título Publicidad" value="${titulo}" oninput="actualizarPreview()">
-      <textarea class="form-control mb-2 t-des" placeholder="Descripción Publicidad" oninput="actualizarPreview()">${desc}</textarea>
-      <button class="btn btn-danger btn-sm" onclick="borrarSec(this,'carrusel',${idx})">Eliminar</button>
-    </div>
-  </div>`;
+    div.dataset.dbId = id;
+    div.innerHTML = `
+        <div class="drag-handle">
+            <i class="bi bi-grip-vertical fs-3"></i>
+        </div>
+        <div class="section-content row g-3 m-0 w-100 align-items-center">
+            <div class="col-md-3">
+                <div style="height:150px; overflow:hidden; border-radius:12px; border: 1px solid #ddd; background:#f8f9fa;">
+                    <img src="${url || '/static/img/placeholder.png'}" class="w-100 h-100" style="object-fit:contain;">
+                </div>
+                <input type="file" class="form-control form-control-sm mt-2" accept=".jpg,.jpeg,.png,.webp,.gif,.avif" onchange="cambioImg(this)">
+            </div>
+            <div class="col-md-9">
+                <div class="pe-3">
+                    <label class="small fw-bold text-muted text-uppercase mb-1">Título del Carrusel</label>
+                    <input type="text" class="form-control mb-2 t-tit fw-bold" placeholder="Título..." value="${titulo}" oninput="actualizarPreview()">
+                    <label class="small fw-bold text-muted text-uppercase mb-1">Descripción</label>
+                    <textarea class="form-control t-des" placeholder="Descripción..." rows="2" oninput="actualizarPreview()">${desc}</textarea>
+                </div>
+                <div class="d-flex justify-content-end mt-3">
+                    <button class="btn btn-sm btn-danger px-4" onclick="borrarSec(this)">
+                        <i class="bi bi-trash-fill"></i> ELIMINAR
+                    </button>
+                </div>
+            </div>
+        </div>`;
     document.getElementById("carruselContainer").appendChild(div);
     actualizarPreview();
 }
 
-function agregarSeccion(url = "", titulo = "", desc = "") {
+function agregarSeccion(url = "", titulo = "", id = "") {
     const idx = seccionIndex++;
-    if (url) seccionesUrls[idx] = url;
     const div = document.createElement("div");
-    div.className = "section-preview";
+    div.className = "col-12 section-preview mb-3";
+    div.draggable = true;
     div.dataset.index = idx;
-    div.innerHTML = `<div class="d-flex gap-3">
-    <div><div class="preview-img-box"><img src="${url || ''}"></div><input type="file" class="form-control form-control-sm" onchange="cambioImg(this,'seccion',${idx})"></div>
-    <div class="flex-grow-1">
-      <input type="text" class="form-control mb-2 t-tit" placeholder="Título Publicidad" value="${titulo}" oninput="actualizarPreview()">
-      <textarea class="form-control mb-2 t-des" placeholder="Descripción Publicidad" oninput="actualizarPreview()">${desc}</textarea>
-      <button class="btn btn-danger btn-sm" onclick="borrarSec(this,'seccion',${idx})">Eliminar</button>
-    </div>
-  </div>`;
+    div.dataset.dbId = id;
+    div.innerHTML = `
+        <div class="drag-handle">
+            <i class="bi bi-grip-vertical fs-3"></i>
+        </div>
+        <div class="section-content d-flex align-items-center gap-4 w-100">
+            <div style="width:90px; height:90px; background:#f8f9fa;" class="rounded-circle overflow-hidden flex-shrink-0 shadow-sm border">
+                <img src="${url || '/static/img/placeholder.png'}" class="w-100 h-100" style="object-fit:contain;">
+            </div>
+            <div class="flex-grow-1">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-4">
+                        <label class="small fw-bold text-muted">Imagen</label>
+                        <input type="file" class="form-control form-control-sm" accept=".jpg,.jpeg,.png,.webp,.gif,.avif" onchange="cambioImg(this)">
+                    </div>
+                    <div class="col-md-8">
+                        <label class="small fw-bold text-muted">Texto</label>
+                        <input type="text" class="form-control t-tit" placeholder="Nombre..." value="${titulo}" oninput="actualizarPreview()">
+                    </div>
+                </div>
+            </div>
+            <button class="btn btn-outline-danger border-0 flex-shrink-0" onclick="borrarSec(this)">
+                <i class="bi bi-trash3-fill fs-5"></i>
+            </button>
+        </div>`;
     document.getElementById("seccionesContainer").appendChild(div);
     actualizarPreview();
 }
 
-function cambioImg(input, tipo, idx) {
-    const file = input.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = e => {
-        input.parentElement.querySelector("img").src = e.target.result;
-        actualizarPreview();
-    };
-    reader.readAsDataURL(file);
-}
-
-function borrarSec(btn, tipo, idx) {
-    btn.closest(".section-preview").remove();
+function agregarCinta(url = "", titulo = "", id = "") {
+    const idx = cintaIndex++;
+    const div = document.createElement("div");
+    div.className = "col-12 section-preview mb-2";
+    div.draggable = true;
+    div.dataset.index = idx;
+    div.dataset.dbId = id;
+    div.innerHTML = `
+        <div class="drag-handle">
+            <i class="bi bi-grip-vertical fs-4"></i>
+        </div>
+        <div class="section-content d-flex align-items-center gap-3 w-100 py-2">
+            <img src="${url || '/static/img/placeholder.png'}" class="rounded-circle border" style="width:50px; height:50px; object-fit:contain; background:#fff;">
+            <div class="flex-grow-1">
+                <div class="row g-2 align-items-center">
+                    <div class="col-md-4"><input type="file" class="form-control form-control-sm" accept=".jpg,.jpeg,.png,.webp,.gif,.avif" onchange="cambioImg(this)"></div>
+                    <div class="col-md-8"><input type="text" class="form-control form-control-sm t-tit" placeholder="Texto..." value="${titulo}" oninput="actualizarPreview()"></div>
+                </div>
+            </div>
+            <button class="btn btn-sm text-danger border-0" onclick="borrarSec(this)"><i class="bi bi-x-circle-fill fs-5"></i></button>
+        </div>`;
+    document.getElementById("cintaContainer").appendChild(div);
     actualizarPreview();
 }
 
 function actualizarPreview() {
     const pCar = document.querySelector("#previewCarrusel .carousel-inner");
-    if (!pCar) return;
-    pCar.innerHTML = "";
-    const carruselItems = document.querySelectorAll("#carruselContainer .section-preview");
-
-    carruselItems.forEach((div, i) => {
-        const img = div.querySelector("img").src;
-        const item = document.createElement("div");
-        item.className = "carousel-item" + (i === 0 ? " active" : "");
-        item.innerHTML = `<img src="${img}" class="d-block w-100" style="height:350px; object-fit:contain; background-color:#f8f9fa;"><div class="carousel-caption-below" style="background:rgba(0,0,0,0.7); color:white; padding:10px; border-radius:8px; margin-top:5px;"><strong>${div.querySelector(".t-tit").value}</strong><br>${div.querySelector(".t-des").value}</div>`;
-        pCar.appendChild(item);
-    });
-
-    const pContainer = document.getElementById("previewCarrusel");
-    pContainer.querySelectorAll('.carousel-control-prev, .carousel-control-next').forEach(c => c.remove());
-
-    if (carruselItems.length > 1) {
-        pContainer.insertAdjacentHTML('beforeend', `
-      <button class="carousel-control-prev" type="button" data-bs-target="#previewCarrusel" data-bs-slide="prev">
-        <span class="carousel-control-prev-icon" aria-hidden="true" style="filter: invert(1);"></span>
-      </button>
-      <button class="carousel-control-next" type="button" data-bs-target="#previewCarrusel" data-bs-slide="next">
-        <span class="carousel-control-next-icon" aria-hidden="true" style="filter: invert(1);"></span>
-      </button>
-    `);
+    if (pCar) {
+        pCar.innerHTML = "";
+        const secciones = document.querySelectorAll("#carruselContainer .section-preview");
+        secciones.forEach((div, i) => {
+            const item = document.createElement("div");
+            item.className = "carousel-item" + (i === 0 ? " active" : "");
+            item.innerHTML = `
+                <img src="${div.querySelector("img").src}" class="d-block w-100" style="height:450px; object-fit:contain; background:#000;">
+                <div class="carousel-caption bg-dark bg-opacity-60 rounded-4 p-3 mb-3 mx-auto" style="max-width: 80%;">
+                    <h5 class="mb-1 fw-bold text-uppercase">${div.querySelector(".t-tit").value}</h5>
+                    <p class="small mb-0">${div.querySelector(".t-des")?.value || ""}</p>
+                </div>`;
+            pCar.appendChild(item);
+        });
+        const carruselElemento = document.querySelector("#previewCarrusel");
+        if (secciones.length > 0) {
+            const bsCarousel = bootstrap.Carousel.getOrCreateInstance(carruselElemento);
+            bsCarousel.to(0);
+        }
+    }
+    
+    const pCinta = document.getElementById("previewCintaMarquee");
+    if (pCinta) {
+        pCinta.innerHTML = "";
+        document.querySelectorAll("#cintaContainer .section-preview").forEach(div => {
+            const s = document.createElement("span");
+            s.className = "mx-4 text-white d-flex align-items-center gap-2";
+            s.innerHTML = `<img src="${div.querySelector("img").src}" class="img-cinta-banner" style="object-fit:contain; background:#fff;"><span class="fw-bold">${div.querySelector(".t-tit").value}</span>`;
+            pCinta.appendChild(s);
+        });
     }
 
     const pSec = document.getElementById("previewSecciones");
@@ -272,105 +179,159 @@ function actualizarPreview() {
         pSec.innerHTML = "";
         document.querySelectorAll("#seccionesContainer .section-preview").forEach(div => {
             const d = document.createElement("div");
-            d.className = "text-center p-2 border m-1";
-            d.style.width = "200px";
-            d.innerHTML = `<img src="${div.querySelector("img").src}" class="img-fluid rounded mb-2" style="height:150px; object-fit:cover;"><div><strong>${div.querySelector(".t-tit").value}</strong><br><small>${div.querySelector(".t-des").value}</small></div>`;
+            d.className = "col-4 col-md-2 text-center mb-4";
+            d.innerHTML = `
+                <div style="width:65px; height:65px; margin: 0 auto; background:#f8f9fa;" class="rounded-circle overflow-hidden shadow-sm mb-2 border">
+                    <img src="${div.querySelector("img").src}" class="w-100 h-100" style="object-fit:contain;">
+                </div>
+                <div class="small fw-bold text-dark text-truncate px-1">${div.querySelector(".t-tit").value}</div>`;
             pSec.appendChild(d);
         });
     }
-    
-    const pInfo = document.getElementById("previewInfo");
-    if (pInfo) pInfo.innerText = document.getElementById("infoInicio").value;
 }
 
 async function guardarMarketing() {
-    if (procesamientoEnCurso) {
-        toast("Por favor espere, procesando solicitud anterior...", "warning");
-        return;
-    }
-
+    if (procesamientoEnCurso) return;
     procesamientoEnCurso = true;
     const btn = document.getElementById("btnGuardarMarketing");
+    const originalText = btn.innerHTML;
     btn.disabled = true;
-    btn.innerText = "Procesando...";
-    
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> GUARDANDO...';
     const formData = new FormData();
-    formData.append("subtitulo", document.getElementById("infoInicio").value);
-
-    const metaC = [], metaS = [];
-
-    document.querySelectorAll("#carruselContainer .section-preview").forEach(div => {
-        const fileInput = div.querySelector('input[type="file"]');
-        const idx = div.dataset.index;
-        const hasNew = fileInput.files.length > 0;
-        if (hasNew) formData.append("imagenes_carrusel", fileInput.files[0]);
-        metaC.push({
-            titulo: div.querySelector(".t-tit").value,
-            descripcion: div.querySelector(".t-des").value,
-            url: carruselUrls[idx] || "",
-            has_new: hasNew
+    const extraerMeta = (containerId, fileKey) => {
+        const metadata = [];
+        document.querySelectorAll(`#${containerId} .section-preview`).forEach(div => {
+            const fileInput = div.querySelector('input[type="file"]');
+            const file = fileInput.files[0];
+            if (file) formData.append(fileKey, file);
+            metadata.push({
+                titulo: div.querySelector(".t-tit").value,
+                descripcion: div.querySelector(".t-des")?.value || "",
+                url_actual: div.querySelector("img").src,
+                cambio_img: div.dataset.cambioImagen === "true"
+            });
         });
-    });
-
-    document.querySelectorAll("#seccionesContainer .section-preview").forEach(div => {
-        const fileInput = div.querySelector('input[type="file"]');
-        const idx = div.dataset.index;
-        const hasNew = fileInput.files.length > 0;
-        if (hasNew) formData.append("imagenes_secciones", fileInput.files[0]);
-        metaS.push({
-            titulo: div.querySelector(".t-tit").value,
-            descripcion: div.querySelector(".t-des").value,
-            url: seccionesUrls[idx] || "",
-            has_new: hasNew
-        });
-    });
-
-    formData.append("metadata_carrusel", JSON.stringify(metaC));
-    formData.append("metadata_secciones", JSON.stringify(metaS));
-
+        return JSON.stringify(metadata);
+    };
+    formData.append("metadata_carrusel", extraerMeta("carruselContainer", "imagenes_carrusel"));
+    formData.append("metadata_secciones", extraerMeta("seccionesContainer", "imagenes_secciones"));
+    formData.append("metadata_cinta", extraerMeta("cintaContainer", "imagenes_cinta"));
     try {
         const response = await fetch("/publicidad_page", { method: "POST", body: formData });
-        const result = await response.json();
-        if (result.ok) {
-            toast(result.msg, "success");
+        if (response.status === 401 || response.status === 403) { location.reload(); return; }
+        const data = await response.json();
+        if (data.ok) {
+            toast("Publicidad actualizada correctamente");
             setTimeout(() => location.reload(), 1500);
+        } else {
+            toast(data.error || "Error al guardar", "danger");
         }
     } catch (error) {
-        toast("Error al guardar", "danger");
+        toast("Error de servidor", "danger");
     } finally {
         procesamientoEnCurso = false;
         btn.disabled = false;
-        btn.innerText = "Guardar y Publicar";
+        btn.innerHTML = originalText;
+    }
+}
+
+function initDrag(containerId) {
+    const container = document.getElementById(containerId);
+    if(!container) return;
+    container.addEventListener('dragstart', e => { 
+        if(e.target.classList.contains('section-preview')) e.target.classList.add('dragging'); 
+    });
+    container.addEventListener('dragend', e => { 
+        if(e.target.classList.contains('section-preview')) { 
+            e.target.classList.remove('dragging'); 
+            actualizarPreview(); 
+        } 
+    });
+    container.addEventListener('dragover', e => {
+        e.preventDefault();
+        const dragging = container.querySelector('.dragging');
+        const afterElement = [...container.querySelectorAll('.section-preview:not(.dragging)')].reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = e.clientY - box.top - box.height / 2;
+            if (offset < 0 && offset > closest.offset) return { offset: offset, element: child };
+            return closest;
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+        if (dragging && afterElement == null) container.appendChild(dragging); 
+        else if (dragging) container.insertBefore(dragging, afterElement);
+    });
+}
+
+function cambioImg(input) {
+    const file = input.files[0];
+    if (!validarArchivo(file)) { input.value = ""; return; }
+    const container = input.closest(".section-preview");
+    const imgElement = container.querySelector("img");
+    const r = new FileReader();
+    r.onload = e => {
+        imgElement.src = e.target.result;
+        container.dataset.cambioImagen = "true";
+        actualizarPreview();
+    };
+    r.readAsDataURL(file);
+}
+
+async function borrarSec(btn) {
+    const container = btn.closest(".section-preview");
+    const dbId = container.dataset.dbId;
+    if (!dbId) {
+        container.remove();
+        actualizarPreview();
+        return;
+    }
+    try {
+        const r = await fetch(`/api/admin/publicidad/delete/${dbId}`, { method: "DELETE" });
+        if (r.status === 401 || r.status === 403) { location.reload(); return; }
+        const d = await r.json();
+        if (d.ok) {
+            container.remove();
+            actualizarPreview();
+            toast("Eliminado correctamente", "info");
+        }
+    } catch (e) {
+        toast("Error de conexión", "danger");
     }
 }
 
 function cargarPublicidadActiva() {
-    fetch("/api/publicidad/activa").then(r => r.json()).then(data => {
-        if (!data || Object.keys(data).length === 0) return;
-        document.getElementById("infoInicio").value = data.subtitulo || "";
-        if (data.metadata_carrusel) {
-            data.metadata_carrusel.forEach(c => agregarCarrusel(c.url, c.titulo, c.descripcion));
-        }
-        if (data.metadata_secciones) {
-            data.metadata_secciones.forEach(s => agregarSeccion(s.url, s.titulo, s.descripcion));
-        }
+    fetch("/api/publicidad/activa")
+    .then(r => {
+        if (r.status === 401 || r.status === 403) { location.reload(); return; }
+        return r.json();
+    })
+    .then(dataList => {
+        if (!Array.isArray(dataList)) return;
+        document.getElementById("carruselContainer").innerHTML = "";
+        document.getElementById("seccionesContainer").innerHTML = "";
+        document.getElementById("cintaContainer").innerHTML = "";
+        dataList.forEach(item => {
+            if (item.tipo === 'carrusel') agregarCarrusel(item.imagen_url, item.titulo, item.descripcion, item.id_publicidad);
+            if (item.tipo === 'seccion') agregarSeccion(item.imagen_url, item.titulo, item.id_publicidad);
+            if (item.tipo === 'cinta') agregarCinta(item.imagen_url, item.titulo, item.id_publicidad);
+        });
         actualizarPreview();
     });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-    cargarAlertas();
-    cargarPublicidadActiva();
+    const esAdmin = document.getElementById("carruselContainer") !== null;
+    if (esAdmin) {
+        cargarPublicidadActiva();
+        initDrag("carruselContainer");
+        initDrag("seccionesContainer");
+        initDrag("cintaContainer");
+        document.getElementById("btnGuardarMarketing")?.addEventListener("click", guardarMarketing);
+    }
 });
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/static/js/workers/service-worker-publicidad.js')
-        .then(reg => {
-            console.log('SW registrado correctamente');
-        })
-        .catch(error => {
-            console.error('Error al registrar el SW:', error);
-        });
+        .then(reg => { console.log('SW OK'); })
+        .catch(err => { console.error('SW Error', err); });
     });
 }

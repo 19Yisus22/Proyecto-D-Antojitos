@@ -204,6 +204,8 @@ if (linkInicio) {
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/static/js/workers/service-worker-login.js').catch(() => {});
+        navigator.serviceWorker.register('/static/js/workers/service-worker-login.js')
+        .then(reg => { console.log('SW OK'); })
+        .catch(err => { console.error('SW Error', err); });
     });
 }
