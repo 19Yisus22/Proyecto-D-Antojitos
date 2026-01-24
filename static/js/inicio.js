@@ -50,22 +50,24 @@ function mostrarToastPublicidad(imagen, titulo, descripcion, isError = false) {
     const t = document.createElement("div");
     t.className = "toast show bg-dark text-white border-light mb-2";
     t.style.display = "block";
-    t.style.minWidth = "320px";
+    t.style.minWidth = "280px";
+    t.style.maxWidth = "350px";
     t.style.borderRadius = "12px";
     t.style.transition = "all 0.5s ease";
+    t.style.pointerEvents = "auto";
     
     const textColor = isError ? '#ff4d4d' : '#e67e22';
     const iconClass = isError ? 'bi-exclamation-triangle-fill' : 'bi-stars';
 
     t.innerHTML = `
         <div class="d-flex align-items-center p-3">
-            <img src="${imagen}" style="width:50px;height:50px;object-fit:cover;border-radius:10px;" class="me-3 shadow" onerror="this.src='/static/uploads/logo.png'">
+            <img src="${imagen}" style="width:45px;height:45px;object-fit:cover;border-radius:10px;" class="me-3 shadow" onerror="this.src='/static/uploads/logo.png'">
             <div class="flex-grow-1">
                 <div class="d-flex align-items-center mb-0">
                     <i class="bi ${iconClass} me-2" style="color: ${textColor};"></i>
-                    <strong style="color: ${textColor}; font-size: 0.95rem;">${titulo}</strong>
+                    <strong style="color: ${textColor}; font-size: 0.9rem;">${titulo}</strong>
                 </div>
-                <div style="font-size: 0.85rem; color: #e0e0e0; line-height: 1.2;">${descripcion}</div>
+                <div style="font-size: 0.8rem; color: #e0e0e0; line-height: 1.2;">${descripcion}</div>
             </div>
             <button class="btn-close btn-close-white ms-2" style="font-size: 0.6rem;"></button>
         </div>`;
@@ -74,7 +76,7 @@ function mostrarToastPublicidad(imagen, titulo, descripcion, isError = false) {
     
     const remove = () => {
         t.style.opacity = '0';
-        t.style.transform = 'translateX(20px)';
+        t.style.transform = 'translateX(-20px)';
         setTimeout(() => t.remove(), 500);
     };
     
@@ -144,8 +146,8 @@ async function cargarMarketing() {
             if (item.tipo === 'seccion') {
                 const delay = (index * 0.15).toFixed(2);
                 const cardHtml = `
-                    <div class="seccion-card shadow-sm h-100" style="animation: fadeInSmooth 0.8s ease forwards; animation-delay: ${delay}s">
-                        <img src="${item.imagen_url || '/static/img/placeholder.png'}" class="postre-imagen-seccion" onerror="this.src='/static/img/placeholder.png'">
+                    <div class="seccion-card shadow-sm h-100 w-100" style="animation: fadeInSmooth 0.8s ease forwards; animation-delay: ${delay}s">
+                        <img src="${item.imagen_url || '/static/img/placeholder.png'}" class="postre-imagen-seccion w-100" onerror="this.src='/static/img/placeholder.png'">
                         <div class="p-3 d-flex flex-column flex-grow-1">
                             <h6 class="fw-bold mb-1" style="color: #d6336c; font-size: 1.1rem;">${item.titulo || ''}</h6>
                             <p class="text-muted mb-0 small" style="line-height: 1.5;">${item.descripcion || ''}</p>
@@ -171,9 +173,9 @@ async function cargarMarketing() {
                 div.innerHTML = `
                     <img src="${item.imagen_url}" class="d-block w-100 carousel-img-render">
                     <div class="caption-custom">
-                        <h6>${item.titulo}</h6>
+                        <h6 class="fs-4">${item.titulo}</h6>
                         <div class="divider mx-auto" style="width:60px; height:3px; background:#d35400; margin:10px auto;"></div>
-                        <p class="fs-5" style="font-weight: 300;">${item.descripcion}</p>
+                        <p class="fs-6" style="font-weight: 300;">${item.descripcion}</p>
                     </div>`;
                 carouselInner.appendChild(div);
             }
@@ -193,10 +195,11 @@ document.addEventListener("DOMContentLoaded", () => {
     cargarMarketing().then(() => {
         setInterval(() => {
             if (notificacionesDisponibles.length > 0) {
-                const e = notificacionesDisponibles[Math.floor(Math.random() * notificacionesDisponibles.length)];
+                const indiceAleatorio = Math.floor(Math.random() * notificacionesDisponibles.length);
+                const e = notificacionesDisponibles[indiceAleatorio];
                 mostrarToastPublicidad(e.imagen_url, e.titulo, e.descripcion);
             }
-        }, 6000);
+        }, 8000);
     });
 
     monitorearCambiosCatalogo();

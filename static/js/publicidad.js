@@ -44,6 +44,102 @@ function validarArchivo(file) {
     return true;
 }
 
+async function crearNotificacion() {
+    if (procesamientoEnCurso) return;
+    const t = document.getElementById("tituloNotificacion");
+    const d = document.getElementById("descNotificacion");
+    const a = document.getElementById("archivoNotificacion");
+    const previewContainer = document.getElementById("previewNotificacion");
+
+    if (!t.value.trim() || !d.value.trim()) {
+        toast("El título y el mensaje son campos obligatorios", "warning");
+        return;
+    }
+
+    procesamientoEnCurso = true;
+    const formData = new FormData();
+    formData.append("titulo", t.value);
+    formData.append("descripcion", d.value);
+    if (a.files[0]) {
+        formData.append("archivo", a.files[0]);
+    }
+
+    try {
+        const res = await fetch("/api/admin/notificaciones", {
+            method: "POST",
+            body: formData
+        });
+        const data = await res.json();
+        if (data.ok) {
+            toast("Notificación publicada exitosamente");
+            t.value = "";
+            d.value = "";
+            a.value = "";
+            if (previewContainer) {
+                previewContainer.style.display = "none";
+                previewContainer.parentElement.style.height = "auto";
+            }
+            cargarAlertasActivas();
+        } else {
+            toast(data.error || "Error al procesar la solicitud", "danger");
+        }
+    } catch (e) {
+        toast("Error de conexión con el servidor", "danger");
+    } finally {
+        procesamientoEnCurso = false;
+    }
+}
+
+async function cargarAlertasActivas() {
+    const cont = document.getElementById("contenedorAlertas");
+    if (!cont) return;
+    try {
+        const res = await fetch("/api/admin/notificaciones");
+        const alertas = await res.json();
+        cont.innerHTML = alertas.length ? "" : '<p class="text-muted small py-2 text-center">No hay alertas activas en este momento</p>';
+        alertas.forEach(alerta => {
+            const div = document.createElement("div");
+            div.className = "alert-admin-lista mb-2 d-flex align-items-center justify-content-between";
+            div.innerHTML = `
+                <div class="d-flex align-items-center gap-2 overflow-hidden">
+                    ${alerta.imagen_url ? `<img src="${alerta.imagen_url}" class="img-notificacion-lista">` : '<i class="bi bi-bell p-2"></i>'}
+                    <div class="text-truncate">
+                        <div class="fw-bold small text-truncate">${alerta.titulo}</div>
+                        <div class="extra-small text-muted text-truncate">${alerta.descripcion}</div>
+                    </div>
+                </div>
+                <button class="btn btn-sm text-danger border-0" onclick="eliminarAlerta('${alerta.id_publicidad}')">
+                    <i class="bi bi-trash3-fill"></i>
+                </button>
+            `;
+            cont.appendChild(div);
+        });
+    } catch (e) {
+        console.error("Error al cargar alertas:", e);
+    }
+}
+
+async function eliminarAlerta(id) {
+    if (!id || id === "undefined") {
+        toast("ID de notificación no válido", "danger");
+        return;
+    }
+    try {
+        const res = await fetch(`/api/admin/notificaciones/${id}`, {
+            method: "DELETE"
+        });
+        const data = await res.json();
+        if (data.ok) {
+            toast("Notificación eliminada correctamente", "success");
+            cargarAlertasActivas();
+        } else {
+            toast(data.error || "No se pudo eliminar la notificación", "danger");
+        }
+    } catch (e) {
+        toast("Error al conectar con el servidor", "danger");
+    }
+}
+
 function agregarCarrusel(url = "", titulo = "", desc = "", id = "") {
     const idx = carruselIndex++;
     const div = document.createElement("div");
@@ -144,8 +240,8 @@ function actualizarPreview() {
     const pCar = document.querySelector("#previewCarrusel .carousel-inner");
     if (pCar) {
         pCar.innerHTML = "";
-        const secciones = document.querySelectorAll("#carruselContainer .section-preview");
-        secciones.forEach((div, i) => {
+        const seccionesCar = document.querySelectorAll("#carruselContainer .section-preview");
+        seccionesCar.forEach((div, i) => {
             const item = document.createElement("div");
             item.className = "carousel-item" + (i === 0 ? " active" : "");
             item.innerHTML = `
@@ -157,7 +253,7 @@ function actualizarPreview() {
             pCar.appendChild(item);
         });
         const carruselElemento = document.querySelector("#previewCarrusel");
-        if (secciones.length > 0) {
+        if (seccionesCar.length > 0 && carruselElemento) {
             const bsCarousel = bootstrap.Carousel.getOrCreateInstance(carruselElemento);
             bsCarousel.to(0);
         }
@@ -169,7 +265,7 @@ function actualizarPreview() {
         document.querySelectorAll("#cintaContainer .section-preview").forEach(div => {
             const s = document.createElement("span");
             s.className = "mx-4 text-white d-flex align-items-center gap-2";
-            s.innerHTML = `<img src="${div.querySelector("img").src}" class="img-cinta-banner" style="object-fit:contain; background:#fff;"><span class="fw-bold">${div.querySelector(".t-tit").value}</span>`;
+            s.innerHTML = `<img src="${div.querySelector("img").src}" class="img-cinta-banner"><span class="fw-bold">${div.querySelector(".t-tit").value}</span>`;
             pCinta.appendChild(s);
         });
     }
@@ -192,42 +288,60 @@ function actualizarPreview() {
 
 async function guardarMarketing() {
     if (procesamientoEnCurso) return;
-    procesamientoEnCurso = true;
+    
     const btn = document.getElementById("btnGuardarMarketing");
     const originalText = btn.innerHTML;
+    
+    procesamientoEnCurso = true;
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> GUARDANDO...';
+
     const formData = new FormData();
-    const extraerMeta = (containerId, fileKey) => {
+
+    const extraerSeccion = (containerId, metaKey, filePrefix) => {
         const metadata = [];
-        document.querySelectorAll(`#${containerId} .section-preview`).forEach(div => {
+        const items = document.querySelectorAll(`#${containerId} .section-preview`);
+        
+        items.forEach((div, index) => {
             const fileInput = div.querySelector('input[type="file"]');
             const file = fileInput.files[0];
-            if (file) formData.append(fileKey, file);
+            
+            // Si hay archivo nuevo, se envía con una llave única vinculada al index
+            if (file) {
+                formData.append(`${filePrefix}_${index}`, file);
+            }
+
             metadata.push({
-                titulo: div.querySelector(".t-tit").value,
+                index: index, // Importante para que el backend asocie el archivo
+                titulo: div.querySelector(".t-tit")?.value || "",
                 descripcion: div.querySelector(".t-des")?.value || "",
                 url_actual: div.querySelector("img").src,
-                cambio_img: div.dataset.cambioImagen === "true"
+                cambio_img: div.dataset.cambioImagen === "true",
+                db_id: div.dataset.dbId || null
             });
         });
-        return JSON.stringify(metadata);
+        formData.append(metaKey, JSON.stringify(metadata));
     };
-    formData.append("metadata_carrusel", extraerMeta("carruselContainer", "imagenes_carrusel"));
-    formData.append("metadata_secciones", extraerMeta("seccionesContainer", "imagenes_secciones"));
-    formData.append("metadata_cinta", extraerMeta("cintaContainer", "imagenes_cinta"));
+
+    extraerSeccion("carruselContainer", "metadata_carrusel", "file_carrusel");
+    extraerSeccion("seccionesContainer", "metadata_secciones", "file_secciones");
+    extraerSeccion("cintaContainer", "metadata_cinta", "file_cinta");
+
     try {
-        const response = await fetch("/publicidad_page", { method: "POST", body: formData });
-        if (response.status === 401 || response.status === 403) { location.reload(); return; }
+        const response = await fetch("/publicidad_page", {
+            method: "POST",
+            body: formData
+        });
+
         const data = await response.json();
         if (data.ok) {
             toast("Publicidad actualizada correctamente");
-            setTimeout(() => location.reload(), 1500);
+            setTimeout(() => location.reload(), 1000);
         } else {
             toast(data.error || "Error al guardar", "danger");
         }
     } catch (error) {
-        toast("Error de servidor", "danger");
+        toast("Error de conexión con el servidor", "danger");
     } finally {
         procesamientoEnCurso = false;
         btn.disabled = false;
@@ -321,10 +435,29 @@ document.addEventListener("DOMContentLoaded", () => {
     const esAdmin = document.getElementById("carruselContainer") !== null;
     if (esAdmin) {
         cargarPublicidadActiva();
+        cargarAlertasActivas();
         initDrag("carruselContainer");
         initDrag("seccionesContainer");
         initDrag("cintaContainer");
         document.getElementById("btnGuardarMarketing")?.addEventListener("click", guardarMarketing);
+        document.getElementById("btnPublicarNotificacion")?.addEventListener("click", crearNotificacion);
+
+        const inputNotificacion = document.getElementById("archivoNotificacion");
+        if (inputNotificacion) {
+            inputNotificacion.onchange = function() {
+                const file = this.files[0];
+                if (validarArchivo(file)) {
+                    const reader = new FileReader();
+                    reader.onload = e => {
+                        const preview = document.getElementById("previewNotificacion");
+                        const img = document.getElementById("previewNotificacionImg");
+                        if (img) img.src = e.target.result;
+                        if (preview) preview.style.display = "block";
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+        }
     }
 });
 

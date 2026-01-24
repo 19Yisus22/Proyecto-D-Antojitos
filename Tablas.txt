@@ -113,6 +113,9 @@ CREATE TABLE comentarios (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+ALTER TABLE comentarios 
+ADD COLUMN likes_usuarios JSONB DEFAULT '[]'::jsonb;
+
 CREATE TABLE publicidad (
     id_publicidad UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tipo TEXT NOT NULL CHECK (tipo IN ('carrusel', 'seccion', 'notificacion', 'cinta')),

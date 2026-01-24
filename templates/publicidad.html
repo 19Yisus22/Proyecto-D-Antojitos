@@ -2,152 +2,150 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Sistema de Publicidad | D'Antojitos ©</title>
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='uploads/logo.ico') }}">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style_publicidad.css') }}">
+    <style>
+        body { min-height: 100vh; display: flex; flex-direction: column; overflow-x: hidden; }
+        .main-content { flex: 1 0 auto; padding: 1rem; width: 100%; }
+        .container-central { width: 100%; max-width: 1300px; margin: 0 auto; }
+        .preview-img-box img { max-height: 180px; width: auto; }
+        #previewInicio { width: 100%; border-radius: 20px; background: #fff; }
+        .gap-cinta-carrusel { margin-bottom: 20px; }
+        .carousel-item img { width: 100%; height: auto; max-height: 500px; object-fit: contain; background: #000; }
+        @media (max-width: 768px) {
+            .display-6 { font-size: 1.5rem; }
+            .card-body { padding: 1rem; }
+            .carousel-item img { max-height: 300px; }
+            .btn-lg { font-size: 1rem; padding: 12px; }
+        }
+    </style>
 </head>
 <body>
     
     {% include 'navbar.html' %}
-    {% if session.get('user_id') and session.get('rol') == 'admin' %}
 
+    {% if session.get('user_id') and session.get('rol') == 'admin' %}
     <div class="main-content">
         <div class="container-central">
-            <div class="card-title-marketing mb-5 text-center d-block">
+            <div class="card-title-marketing mb-4 text-center">
                 <h3 class="display-6 fw-bold m-0"><i class="bi bi-megaphone"></i> Panel de Publicidad</h3>
-                <p class="text-white-50 mb-0">Administra Notificaciones, Carruseles, Tarjetas Informativas y Cinta Publicitaria</p>
+                <p class="text-white-50 mb-0">Gestión de Notificaciones y Contenido Visual</p>
             </div>
 
             <div class="card section-notificaciones shadow-sm mb-4">
-                <div class="card-body p-4">
+                <div class="card-body">
                     <div class="d-flex align-items-center gap-2 mb-4">
                         <i class="bi bi-bell-fill fs-4 text-warning"></i>
-                        <h4 class="m-0 fw-bold">Sistema de Notificación</h4>
+                        <h4 class="m-0 fw-bold">Sistema de Alertas</h4>
                     </div>
                     <div class="row g-3">
                         <div class="col-12 col-lg-4">
-                            <label class="form-label fw-bold small text-uppercase">Agregar Imagen</label>
+                            <label class="form-label fw-bold small">IMAGEN (OPCIONAL)</label>
                             <div id="previewNotificacion" class="preview-img-box mb-2" style="display:none">
-                                <img id="previewNotificacionImg" src="" alt="Vista previa" class="img-fluid rounded">
+                                <img id="previewNotificacionImg" src="" alt="Vista previa" class="img-fluid rounded border shadow-sm">
                             </div>
                             <input type="file" id="archivoNotificacion" class="form-control" accept="image/*">
                         </div>
                         <div class="col-12 col-lg-4">
-                            <label class="form-label fw-bold small text-uppercase">Título a mostrar</label>
-                            <input type="text" id="tituloNotificacion" class="form-control mb-2" placeholder="Ej: ¡Gran Descuento!">
-                            <label class="form-label fw-bold small text-uppercase">Descripción</label>
-                            <textarea id="descNotificacion" class="form-control" rows="2" placeholder="Detalle de la alerta..."></textarea>
+                            <label class="form-label fw-bold small">TÍTULO</label>
+                            <input type="text" id="tituloNotificacion" class="form-control mb-2" placeholder="Ej: ¡Nuevo Producto!">
+                            <label class="form-label fw-bold small">MENSAJE</label>
+                            <textarea id="descNotificacion" class="form-control" rows="2" placeholder="Descripción..."></textarea>
                         </div>
                         <div class="col-12 col-lg-4 d-flex align-items-end">
-                            <button class="btn btn-warning w-100 py-3 fw-bold shadow-sm" onclick="crearNotificacion()">
-                                <i class="bi bi-plus-circle-fill"></i> PUBLICAR NOTIFICACIÓN
+                            <button class="btn btn-warning w-100 py-3 fw-bold shadow" onclick="crearNotificacion()">
+                                <i class="bi bi-plus-circle-fill"></i> PUBLICAR ALERTA
                             </button>
                         </div>
                         <div class="col-12 mt-4">
-                            <h6 class="fw-bold border-bottom pb-2 text-muted">Viendo alertas activas</h6>
-                            <div id="contenedorAlertas" class="d-flex flex-column gap-2 mt-3"></div>
+                            <h6 class="fw-bold border-bottom pb-2 text-muted small text-uppercase">Alertas Activas</h6>
+                            <div id="contenedorAlertas" class="d-flex flex-column gap-2 mt-2"></div>
                         </div>
                     </div>
                 </div>
             </div>
 
             <div class="card section-carrusel shadow-sm mb-4">
-                <div class="card-body p-4">
+                <div class="card-body">
                     <div class="d-flex align-items-center gap-2 mb-4">
                         <i class="bi bi-images fs-4 text-primary"></i>
-                        <h4 class="m-0 fw-bold">Carrusel Principal</h4>
+                        <h4 class="m-0 fw-bold">Carruseles</h4>
                     </div>
                     <div id="carruselContainer" class="row g-3"></div>
-                    <button class="btn btn-outline-primary w-100 mt-4 fw-bold border-2" onclick="agregarCarrusel()">
-                        <i class="bi bi-plus-lg"></i> AGREGAR NUEVA SECCIÓN
+                    <button class="btn btn-outline-primary w-100 mt-4 fw-bold" onclick="agregarCarrusel()">
+                        <i class="bi bi-plus-lg"></i> AGREGAR DIAPOSITIVA
                     </button>
                 </div>
             </div>
 
             <div class="card section-secundarias shadow-sm mb-4">
-                <div class="card-body p-4">
+                <div class="card-body">
                     <div class="d-flex align-items-center gap-2 mb-4">
                         <i class="bi bi-grid-3x3-gap-fill fs-4" style="color: #6f42c1;"></i>
                         <h4 class="m-0 fw-bold">Tarjetas Informativas</h4>
                     </div>
                     <div id="seccionesContainer" class="row g-3"></div>
-                    <button class="btn btn-outline-secondary w-100 mt-4 fw-bold border-2" onclick="agregarSeccion()">
-                        <i class="bi bi-plus-lg"></i> AGREGAR TARJETA INFORMATIVA
+                    <button class="btn btn-outline-secondary w-100 mt-4 fw-bold" onclick="agregarSeccion()">
+                        <i class="bi bi-plus-lg"></i> AGREGAR TARJETA
                     </button>
                 </div>
             </div>
 
             <div class="card section-cinta shadow-sm mb-4">
-                <div class="card-body p-4">
+                <div class="card-body">
                     <div class="d-flex align-items-center gap-2 mb-4">
                         <i class="bi bi-cursor-text fs-4 text-success"></i>
                         <h4 class="m-0 fw-bold">Cinta Publicitaria</h4>
                     </div>
                     <div id="cintaContainer" class="row g-3"></div>
-                    <button class="btn btn-outline-success w-100 mt-4 fw-bold border-2" onclick="agregarCinta()">
-                        <i class="bi bi-plus-lg"></i> AGREGAR NUEVO CAMPO EN LA CINTA
+                    <button class="btn btn-outline-success w-100 mt-4 fw-bold" onclick="agregarCinta()">
+                        <i class="bi bi-plus-lg"></i> AGREGAR A LA CINTA
                     </button>
                 </div>
             </div>
 
-            <div class="sticky-bottom bg-white p-3 border-top shadow-lg rounded-4 mb-5 mx-2" style="z-index: 999;">
+            <div class="sticky-bottom bg-white p-3 border-top shadow-lg rounded-4 mb-5 mx-2" style="z-index: 1000;">
                 <button id="btnGuardarMarketing" class="btn btn-dark btn-lg w-100 fw-bold py-3 shadow">
-                    <i class="bi bi-cloud-arrow-up-fill"></i> GUARDAR Y PUBLICAR <i class="bi bi-cloud-arrow-up-fill"></i>
+                    <i class="bi bi-cloud-arrow-up-fill"></i> GUARDAR TODOS LOS CAMBIOS
                 </button>
             </div>
 
-            <div class="mb-5">
+            <div class="mb-5 pb-5">
                 <div class="d-flex align-items-center justify-content-center gap-2 mb-4">
                     <i class="bi bi-eye-fill fs-4 text-muted"></i>
                     <h5 class="m-0 text-muted text-uppercase fw-bold">Previsualización en Vivo</h5>
                 </div>
-                <div id="previewInicio" class="border rounded-4 bg-white shadow-lg overflow-hidden">
-                    <div class="promo-banner bg-dark py-2 overflow-hidden">
+                <div id="previewInicio" class="border shadow-lg overflow-hidden">
+                    <div class="promo-banner bg-dark py-2 overflow-hidden gap-cinta-carrusel">
                         <div id="previewCintaMarquee" class="d-flex align-items-center"></div>
                     </div>
-                    
-                    <div id="previewCarrusel" class="carousel slide" data-bs-ride="carousel" data-bs-interval="5000">
+                    <div id="previewCarrusel" class="carousel slide" data-bs-ride="carousel">
                         <div class="carousel-inner"></div>
-                        <button class="carousel-control-prev" type="button" data-bs-target="#previewCarrusel" data-bs-slide="prev">
-                            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                            <span class="visually-hidden">Anterior</span>
-                        </button>
-                        <button class="carousel-control-next" type="button" data-bs-target="#previewCarrusel" data-bs-slide="next">
-                            <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                            <span class="visually-hidden">Siguiente</span>
-                        </button>
                     </div>
-
                     <div id="previewSecciones" class="row g-3 p-4 justify-content-center m-0"></div>
                 </div>
             </div>
         </div>
     </div>
     {% else %}
-    <main class="container">
-        <div class="card-denied shadow-lg">
+    <main class="container py-5 text-center flex-grow-1">
+        <div class="card border-0 shadow-lg p-5">
             <i class="bi bi-shield-lock-fill text-danger display-1 mb-4"></i>
-            <h2 class="denied-title">Acceso Denegado</h2>
-            <p class="fs-4 text-muted">No tienes permisos para acceder a esta sección administrativa.</p>
-            <p class="text-uppercase fw-bold text-secondary">(RECURSO RESTRINGIDO SOLO A ADMINISTRADORES)</p>
-            <a href="{{ url_for('inicio') }}" class="btn btn-primary mt-4 px-5 py-3 fs-5 fw-bold shadow">
-                <i class="bi bi-house-door-fill"></i> Volver al Inicio
-            </a>
+            <h2 class="fw-bold">Acceso Restringido</h2>
+            <p class="text-muted">Solo administradores pueden acceder a este panel.</p>
+            <a href="{{ url_for('inicio') }}" class="btn btn-primary px-5 py-2">Volver al Inicio</a>
         </div>
     </main>
-    <script>
-        setTimeout(() => { 
-            window.location.href = "{{ url_for('inicio') }}"; 
-        }, 5000);
-    </script>
+    <script>setTimeout(() => { window.location.href = "{{ url_for('inicio') }}"; }, 4000);</script>
     {% endif %}
 
     {% include 'footer.html' %}
     
-    <div id="toastContainer"></div>
+    <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 11000;"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/publicidad.js') }}"></script>

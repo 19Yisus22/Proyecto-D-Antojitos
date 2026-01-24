@@ -202,7 +202,7 @@ def logout():
         except:
             pass
     session.clear()
-    return redirect("/inicio")
+    return redirect("/login")
 
 # APARTADO DE PERFILES
 
@@ -1008,26 +1008,25 @@ def comentarios_page():
 
 @app.route("/comentarios", methods=["GET"])
 def obtener_comentarios():
-
     try:
-
         comentarios_res = supabase.table("comentarios").select("*").order("created_at", desc=False).execute()
         comentarios = comentarios_res.data or []
+        
         usuarios_res = supabase.table("usuarios").select("id_cliente,nombre,apellido,imagen_url,ultima_conexion").execute()
         usuarios_data = usuarios_res.data or []
+        
         ahora = datetime.now(timezone.utc)
         usuarios_dict = {}
         
         for u in usuarios_data:
             esta_conectado = False
             ultima_con = u.get("ultima_conexion")
-            
             if ultima_con:
                 try:
                     fecha_con = datetime.fromisoformat(ultima_con.replace('Z', '+00:00'))
                     if (ahora - fecha_con).total_seconds() < 60:
                         esta_conectado = True
-                except Exception:
+                except:
                     esta_conectado = False
 
             usuarios_dict[u["id_cliente"]] = {
@@ -1038,68 +1037,79 @@ def obtener_comentarios():
             }
 
         for c in comentarios:
-            info = usuarios_dict.get(c["id_usuario"], {
-                "nombre": "Usuario", 
-                "apellido": "Desconocido", 
-                "foto_perfil": None, 
-                "conectado": False
+            c["usuario_info"] = usuarios_dict.get(c["id_usuario"], {
+                "nombre": "Usuario", "apellido": "", "foto_perfil": None, "conectado": False
             })
-            
-            c["usuario_info"] = info
-            
-            if not c.get("foto_perfil"):
-                c["foto_perfil"] = info["foto_perfil"]
+            if c.get("likes_usuarios") is None:
+                c["likes_usuarios"] = []
 
         return jsonify(comentarios)
-
     except Exception as e:
-        print(f"Error en endpoint comentarios: {e}")
+        print(f"Error en GET /comentarios: {e}")
         return jsonify({"error": str(e)}), 500
-    
+
 @app.route("/actualizar_estado_comentarios", methods=["POST"])
 def actualizar_estado_comentarios():
-
     try:
         user_id = session.get("user_id")
-
         if not user_id:
             return jsonify({"status": "no_auth"}), 401
+            
         ahora = datetime.now(timezone.utc).isoformat()
-        supabase.table("usuarios")\
-            .update({"ultima_conexion": ahora})\
-            .eq("id_cliente", user_id)\
-            .execute()
+        supabase.table("usuarios").update({"ultima_conexion": ahora}).eq("id_cliente", user_id).execute()
 
-        return jsonify({
-            "status": "ok",
-            "last_check": ahora}), 200
-    
+        return jsonify({"status": "ok"}), 200
     except Exception as e:
-        print(f"Error crítico en actualizar_estado_comentarios: {e}")
+        print(f"Error en actualizar_estado: {e}")
         return jsonify({"error": "server_error"}), 500
+
+@app.route("/comentarios/<id>/like", methods=["POST"])
+def toggle_like(id):
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"error": "No auth"}), 401
+
+    try:
+        res = supabase.table("comentarios").select("likes_usuarios").eq("id", id).single().execute()
+        if not res.data:
+            return jsonify({"error": "No encontrado"}), 404
+            
+        likes = res.data.get("likes_usuarios")
+        if not isinstance(likes, list):
+            likes = []
+        
+        if user_id in likes:
+            likes.remove(user_id)
+        else:
+            likes.append(user_id)
+
+        supabase.table("comentarios").update({"likes_usuarios": likes}).eq("id", id).execute()
+        return jsonify({"status": "ok", "likes": likes})
+    except Exception as e:
+        print(f"Error en Like: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/comentarios", methods=["POST"])
 def crear_comentario():
-
     if "user_id" not in session:
-        return jsonify({"error": "Usuario no autenticado"}), 401
+        return jsonify({"error": "No auth"}), 401
+    
     data = request.get_json()
     mensaje = data.get("mensaje", "").strip()
-
     if not mensaje:
-        return jsonify({"error": "Mensaje requerido"}), 400
-    res_usuario = supabase.table("usuarios").select("id_cliente,nombre,apellido,correo,imagen_url").eq("id_cliente", session["user_id"]).single().execute()
-    user = res_usuario.data
+        return jsonify({"error": "Vacio"}), 400
 
-    if not user:
-        return jsonify({"error": "Usuario no encontrado"}), 404
-    
+    res_user = supabase.table("usuarios").select("*").eq("id_cliente", session["user_id"]).single().execute()
+    u = res_user.data
+
     nuevo = supabase.table("comentarios").insert({
-        "id_usuario": user["id_cliente"],
-        "nombre_usuario": f"{user['nombre']} {user['apellido']}",
-        "correo_usuario": user["correo"],
-        "foto_perfil": user.get("imagen_url"),
-        "mensaje": mensaje}).execute()
+        "id_usuario": u["id_cliente"],
+        "nombre_usuario": f"{u['nombre']} {u['apellido']}",
+        "correo_usuario": u["correo"],
+        "foto_perfil": u.get("imagen_url"),
+        "mensaje": mensaje,
+        "likes_usuarios": []
+    }).execute()
     return jsonify(nuevo.data[0])
 
 @app.route("/comentarios/<id>", methods=["PUT"])

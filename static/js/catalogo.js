@@ -133,8 +133,7 @@ function mostrarToastActualizacion(imagen, titulo, descripcion, idUnico, isError
     productosNotificados.add(idUnico);
     mostrarToastPublicidad(imagen, titulo, descripcion, isError);
     setTimeout(() => {
-        productosNotificados.delete(idUnico);
-    }, 15000);
+        productosNotificados.delete(idUnico);}, 7000);
 }
 
 function toggleFavorito(id) {
@@ -370,15 +369,11 @@ function crearCardProductoHTML(p) {
     col.className = `col-md-6 col-lg-4 mb-2 fade-in`;
     col.dataset.id = p.id_producto;
     const isAgotado = p.stock <= 0;
-    const isFav = favoritos.includes(p.id_producto.toString());
     const imgUrl = p.imagen_url || '/static/uploads/default.png';
 
     col.innerHTML = `
         <div class="card h-100 product-card shadow-sm ${isAgotado ? 'producto-gris' : ''}" style="border-radius: 24px; border: 1px solid rgba(0,0,0,0.05); transition: all 0.3s ease;">
             <div class="img-wrapper position-relative overflow-hidden" style="height: 220px; border-radius: 24px 24px 0 0;">
-                <div class="btn-favorito-star" onclick="toggleFavorito('${p.id_producto}')">
-                    <i class="bi ${isFav ? 'bi-heart-fill text-danger' : 'bi-heart text-white'}"></i>
-                </div>
                 <img src="${imgUrl}" alt="${p.nombre}" style="width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s ease;" onerror="this.src='/static/uploads/default.png'">
                 ${isAgotado ? '<div class="letrero-agotado">AGOTADO</div>' : ''}
             </div>
@@ -387,7 +382,7 @@ function crearCardProductoHTML(p) {
                     <h5 class="card-title fw-bold mb-0" style="font-size: 1.15rem; color: #1a1a1a;">${p.nombre}</h5>
                     <span class="price-tag" style="background: #fff3e0; color: #e67e22; padding: 4px 12px; border-radius: 12px; font-weight: 700;">$${p.precio.toLocaleString()}</span>
                 </div>
-                <p class="text-muted small mb-3" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; height: 40px;">${p.descripcion}</p>
+                <div class="product-description text-muted small mb-3">${p.descripcion}</div>
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <div class="stock-badge py-1 px-2 rounded-pill" style="background: ${p.stock < 5 ? '#fff1f0' : '#f6ffed'}; border: 1px solid ${p.stock < 5 ? '#ffa39e' : '#b7eb8f'};">
                         <small class="${p.stock < 5 ? 'text-danger' : 'text-success'} fw-bold"><i class="bi bi-box-seam me-1"></i>${p.stock} disponibles</small>
@@ -507,7 +502,7 @@ window.onload = () => {
     cargarProductos();
     resetBotonesEstado();
     setInterval(cargarProductos, 8000);
-    setInterval(cargarCintaPublicitaria, 30000);
+    setInterval(cargarCintaPublicitaria, 10000);
     if (userLogged && userLogged !== "false") {
         sincronizarContadorCarrito();
         setInterval(sincronizarContadorCarrito, 15000);
