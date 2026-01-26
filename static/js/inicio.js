@@ -172,7 +172,8 @@ async function cargarMarketing() {
                 div.className = `carousel-item ${carouselInner.children.length === 0 ? 'active' : ''}`;
                 div.innerHTML = `
                     <div class="carousel-img-wrapper">
-                        <img src="${item.imagen_url}" class="d-block w-100 carousel-img-render">
+                        <img src="${item.imagen_url}" class="carousel-background-blur">
+                        <img src="${item.imagen_url}" class="d-block carousel-img-render">
                         <div class="carousel-overlay"></div>
                     </div>
                     <div class="carousel-caption-custom">
