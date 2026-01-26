@@ -125,7 +125,7 @@ body {
     font-size: 0.9rem;
     color: var(--gray-muted);
     margin-bottom: 1rem;
-    white-space: pre-line; /* Permite visualizar los saltos de línea del admin */
+    white-space: pre-line;
     line-height: 1.5;
 }
 

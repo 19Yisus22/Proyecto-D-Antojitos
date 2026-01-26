@@ -2,11 +2,11 @@ const catalogoContainer = document.getElementById("catalogoProductos");
 const btnFiltrar = document.getElementById("btnFiltrar");
 const searchInput = document.getElementById("searchInput");
 const toastContainer = document.getElementById("toastContainer");
-const btnCarrito = document.getElementById("btnCarrito");
-const badgeCarrito = document.getElementById("contadorCarritoBadge");
 
 let postres = [];
 let indexActual = null;
+let isUpdating = false;
+
 const btnAgregarPostre = document.getElementById("btnAgregarPostre");
 const btnCancelar = document.getElementById("btnCancelar");
 const formAgregarPostre = document.getElementById("formAgregarPostre");
@@ -16,6 +16,7 @@ const listaPostresAgotados = document.getElementById("listaPostresAgotados");
 const avisoAgotados = document.getElementById("avisoAgotados");
 const modalElement = document.getElementById("modalPostre");
 const modal = new bootstrap.Modal(modalElement);
+const btnSubmitForm = document.getElementById("btnSubmitForm");
 
 function ajustarAtributosPrecio() {
     const precioInput = document.getElementById("precioPostre");
@@ -25,8 +26,7 @@ function ajustarAtributosPrecio() {
 }
 
 function showMessage(msg, isError = false) {
-    const container = document.getElementById('toastContainer');
-    if (!container) return;
+    if (!toastContainer) return;
     
     const toast = document.createElement('div');
     toast.className = 'custom-toast';
@@ -37,10 +37,11 @@ function showMessage(msg, isError = false) {
         </div>
         <i class="bi bi-x-lg ms-3 btn-close-toast" style="cursor:pointer; font-size: 0.7rem;"></i>
     `;
-    container.appendChild(toast);
+    toastContainer.appendChild(toast);
     
     const remove = () => {
         toast.style.opacity = '0';
+        toast.style.transform = 'translateX(-20px)';
         setTimeout(() => toast.remove(), 400);
     };
     
@@ -51,6 +52,7 @@ function showMessage(msg, isError = false) {
 btnAgregarPostre.addEventListener("click", () => {
     indexActual = null;
     agregarPostreForm.reset();
+    btnSubmitForm.innerHTML = '<i class="bi bi-check-lg me-2"></i>Subir Postre';
     formAgregarPostre.classList.remove("d-none");
     window.scrollTo({ top: 0, behavior: 'smooth' });
 });
@@ -61,24 +63,29 @@ btnCancelar.addEventListener("click", () => {
     indexActual = null;
 });
 
-async function cargarPostres() {
-    const cached = localStorage.getItem('postresCache');
-    if (cached) {
-        postres = JSON.parse(cached);
-        renderPostres();
-    }
+async function cargarPostres(silent = false) {
+    if (isUpdating && !silent) return;
+    isUpdating = true;
+
     try {
         const res = await fetch("/gestionar_productos");
+        
         if (res.status === 401 || res.status === 403) {
-            showMessage("Inicie Sesión para gestionar", true);
-            document.querySelectorAll("button, input, textarea").forEach(el => el.disabled = true);
+            if (!silent) showMessage("Sesión expirada", true);
             return;
         }
-        postres = await res.json();
-        localStorage.setItem('postresCache', JSON.stringify(postres));
-        renderPostres();
+
+        const nuevosPostres = await res.json();
+        
+        if (JSON.stringify(nuevosPostres) !== JSON.stringify(postres)) {
+            postres = nuevosPostres;
+            localStorage.setItem('postresCache', JSON.stringify(postres));
+            renderPostres();
+        }
     } catch (error) {
-        console.error("Error cargando productos:", error);
+        console.error("Error en actualización:", error);
+    } finally {
+        isUpdating = false;
     }
 }
 
@@ -93,18 +100,18 @@ function renderPostres() {
         const imgUrl = p.imagen_url || "/static/uploads/default.png";
         
         card.innerHTML = `
-        <div class="card w-100 cursor-pointer ${p.stock <= 0 ? 'gris' : ''}">
+        <div class="card w-100 cursor-pointer ${p.stock <= 0 ? 'gris' : ''}" data-id="${p.id_producto}">
             <img src="${imgUrl}" class="card-img-top postre-img" alt="${p.nombre}">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start mb-1">
                     <h5 class="card-title mb-0 text-truncate" style="max-width: 150px;" title="${p.nombre}">${p.nombre}</h5>
-                    <span class="badge bg-info text-dark">${p.stock}</span>
+                    <span class="badge ${p.stock <= 5 ? 'bg-danger' : 'bg-info'} text-dark">${p.stock}</span>
                 </div>
                 <p class="card-text fw-bold">${Number(p.precio).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}</p>
             </div>
         </div>`;
 
-        card.querySelector(".card").addEventListener("click", () => abrirModalPostre(index));
+        card.querySelector(".card").onclick = () => abrirModalPostre(index);
 
         if (p.stock > 0) {
             listaPostresDisponibles.appendChild(card);
@@ -127,47 +134,45 @@ function abrirModalPostre(index) {
     modal.show();
 }
 
-document.getElementById("btnEliminar").addEventListener("click", async () => {
+document.getElementById("btnEliminar").onclick = async () => {
     if (indexActual === null) return;
-    
     const p = postres[indexActual];
     
     try {
         const res = await fetch(`/eliminar_producto/${p.id_producto}`, { 
-            method: "DELETE",
-            headers: { 'Content-Type': 'application/json' }
+            method: "DELETE"
         });
-
+        
         if (res.ok) {
-            showMessage("Producto eliminado correctamente");
+            showMessage("Producto eliminado");
             modal.hide();
-            await cargarPostres();
             indexActual = null;
+            await cargarPostres();
         } else {
-            const errorData = await res.json();
-            showMessage(errorData.error || "Error al eliminar el producto", true);
+            const err = await res.json();
+            showMessage(err.error || "Error al eliminar", true);
         }
-    } catch (error) {
-        showMessage("Error de conexión al eliminar", true);
+    } catch (e) {
+        showMessage("Error de conexión", true);
     }
-});
+};
 
-document.getElementById("btnEditar").addEventListener("click", () => {
+document.getElementById("btnEditar").onclick = () => {
     if (indexActual === null) return;
     const p = postres[indexActual];
     
-    formAgregarPostre.classList.remove("d-none");
     document.getElementById("nombrePostre").value = p.nombre;
     document.getElementById("precioPostre").value = p.precio;
     document.getElementById("descripcionPostre").value = p.descripcion;
     document.getElementById("stockPostre").value = p.stock;
-    document.getElementById("fotoPostre").value = "";
     
+    btnSubmitForm.innerHTML = '<i class="bi bi-pencil-square me-2"></i>Actualizar Postre';
+    formAgregarPostre.classList.remove("d-none");
     modal.hide();
     window.scrollTo({ top: 0, behavior: 'smooth' });
-});
+};
 
-agregarPostreForm.addEventListener("submit", async (e) => {
+agregarPostreForm.onsubmit = async (e) => {
     e.preventDefault();
     const fileInput = document.getElementById("fotoPostre");
     const file = fileInput.files[0];
@@ -189,7 +194,7 @@ agregarPostreForm.addEventListener("submit", async (e) => {
     } else {
         await enviarFormulario(formData);
     }
-});
+};
 
 async function enviarFormulario(formData) {
     const esEdicion = indexActual !== null;
@@ -199,28 +204,34 @@ async function enviarFormulario(formData) {
     try {
         const res = await fetch(url, { method: metodo, body: formData });
         
-        if (res.status === 401 || res.status === 403) {
-            showMessage("No tienes permisos para realizar esta acción", true);
-            return;
-        }
-
         if (res.ok) {
             formAgregarPostre.classList.add("d-none");
             agregarPostreForm.reset();
             indexActual = null;
             await cargarPostres();
-            showMessage(esEdicion ? "Postre actualizado con éxito" : "Postre agregado con éxito");
+            showMessage(esEdicion ? "Actualizado correctamente" : "Agregado correctamente");
         } else {
-            showMessage("Error en la operación", true);
+            showMessage("Error al guardar datos", true);
         }
-    } catch (error) {
-        showMessage("Error de conexión al guardar", true);
+    } catch (e) {
+        showMessage("Error de red", true);
     }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
     ajustarAtributosPrecio();
+    
+    const cached = localStorage.getItem('postresCache');
+    if (cached) {
+        postres = JSON.parse(cached);
+        renderPostres();
+    }
+    
     cargarPostres();
+    
+    setInterval(() => {
+        cargarPostres(true);
+    }, 10000);
 });
 
 if ('serviceWorker' in navigator) {

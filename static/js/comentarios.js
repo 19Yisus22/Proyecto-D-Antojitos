@@ -5,6 +5,8 @@ const toastContainer = document.getElementById('toastContainer');
 let editandoComentario = null;
 let comentariosActuales = [];
 
+const toastSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3');
+
 const monitorConexion = {
     intervalo: null,
     frecuencia: 30000,
@@ -12,6 +14,9 @@ const monitorConexion = {
         if (!USER_CONFIG.userId) return;
         this.enviarSenal();
         this.intervalo = setInterval(() => this.enviarSenal(), this.frecuencia);
+    },
+    detener() {
+        if (this.intervalo) clearInterval(this.intervalo);
     },
     async enviarSenal() {
         try {
@@ -33,6 +38,7 @@ function getUserColor(userId) {
 }
 
 function showMessage(msg, isError = false) {
+    toastSound.play().catch(e => console.log("Interacción requerida para audio"));
     const toast = document.createElement('div');
     toast.className = 'custom-toast';
     toast.innerHTML = `
@@ -45,6 +51,7 @@ function showMessage(msg, isError = false) {
     toastContainer.appendChild(toast);
     const remove = () => {
         toast.style.opacity = '0';
+        toast.style.transform = 'translateX(-20px)';
         setTimeout(() => toast.remove(), 400);
     };
     toast.querySelector('.btn-close-toast').onclick = remove;
@@ -57,6 +64,7 @@ function renderComentario(c) {
     div.className = "message position-relative shadow-sm border rounded-4 p-3 mb-3";
     div.style.backgroundColor = bgColor;
     div.id = `msg-${c.id}`;
+    div.setAttribute("data-user-id", c.id_usuario);
     
     const info = c.usuario_info || {};
     const foto = info.foto_perfil || 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
@@ -64,7 +72,13 @@ function renderComentario(c) {
     const fecha = new Date(c.created_at).toLocaleString('es-CO', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
     
     const esMio = String(c.id_usuario) === String(USER_CONFIG.userId);
-    const estadoClase = info.conectado ? 'estado-conectado' : 'estado-desconectado';
+    
+    const ultimaConexion = info.ultima_conexion ? new Date(info.ultima_conexion) : null;
+    const esFechaLogout = ultimaConexion && ultimaConexion.getFullYear() === 2000;
+    const estaConectadoRealmente = info.conectado && !esFechaLogout;
+    
+    const estadoClase = estaConectadoRealmente ? 'estado-conectado' : 'estado-desconectado';
+    
     const likes = Array.isArray(c.likes_usuarios) ? c.likes_usuarios : [];
     const yaDiLike = likes.includes(USER_CONFIG.userId);
 
@@ -165,7 +179,6 @@ async function ejecutarEliminacionDirecta(id) {
     try {
         const res = await fetch(`/comentarios/${id}`, {method:"DELETE"});
         if(res.ok) {
-            showMessage("Sugerencia eliminada");
             cargarComentarios();
         }
     } catch(e) { showMessage("Error de conexión", true); }
@@ -184,16 +197,22 @@ sendBtn.onclick = async () => {
     sendBtn.disabled = true;
     try {
         let url = "/comentarios", method = "POST";
+        let successMsg = "Comentario publicado";
+        
         if(editandoComentario) {
             url = `/comentarios/${editandoComentario}`;
             method = "PUT";
+            successMsg = "Comentario actualizado";
         }
+        
         const res = await fetch(url, {
             method: method,
             headers: {"Content-Type":"application/json"},
             body: JSON.stringify({mensaje})
         });
+        
         if(res.ok) {
+            showMessage(successMsg);
             mensajeInput.value = "";
             editandoComentario = null;
             sendBtn.innerHTML = `<i class="bi bi-send me-2"></i>Enviar`;
@@ -208,6 +227,33 @@ window.onload = () => {
     monitorConexion.iniciar();
     setInterval(cargarComentarios, 8000);
 };
+
+document.addEventListener("DOMContentLoaded", () => {
+    const logoutBtn = document.getElementById("logoutBtn");
+    
+    if (logoutBtn) {
+        logoutBtn.onclick = async (e) => {
+            e.preventDefault();
+            const url = logoutBtn.getAttribute("href");
+
+            monitorConexion.detener();
+
+            const misComentarios = document.querySelectorAll(`[data-user-id="${USER_CONFIG.userId}"] .punto-estado`);
+            misComentarios.forEach(punto => {
+                punto.classList.remove('estado-conectado');
+                punto.classList.add('estado-desconectado');
+            });
+
+            const profileStatus = document.querySelector(".profile-status");
+            if (profileStatus) {
+                profileStatus.innerText = "Desconectado";
+                profileStatus.style.color = "#6c757d";
+            }
+
+            window.location.href = url;
+        };
+    }
+});
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {

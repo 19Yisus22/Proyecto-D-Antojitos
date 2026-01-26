@@ -59,6 +59,12 @@ html, body {
     box-shadow: 0 8px 20px rgba(0,0,0,0.06);
 }
 
+.mensaje-texto {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    line-height: 1.5;
+}
+
 .contenedor-foto-estado {
     position: relative;
     width: 45px;
@@ -89,7 +95,9 @@ html, body {
 .form-control {
     border: 2px solid #f1f3f5;
     border-radius: 14px;
-    resize: none;
+    resize: vertical;
+    min-height: 45px;
+    max-height: 200px;
 }
 
 .btn-primary {
@@ -103,6 +111,36 @@ footer, .footer {
     color: #fff;
     padding: 40px 0 20px 0;
     border-top: 4px solid var(--primary);
+}
+
+.custom-toast {
+    position: fixed;
+    bottom: 25px;
+    left: 25px;
+    background: var(--dark-bg);
+    color: white;
+    border-radius: 15px;
+    padding: 15px 25px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 10000;
+    border-left: 5px solid var(--primary);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    min-width: 280px;
+    animation: slideInLeft 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+@keyframes slideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-100%) scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+    }
 }
 
 @keyframes pulse-green {
@@ -133,5 +171,11 @@ footer, .footer {
 
     .message {
         border-radius: 15px;
+    }
+
+    .custom-toast {
+        left: 10px;
+        bottom: 10px;
+        min-width: calc(100% - 20px);
     }
 }

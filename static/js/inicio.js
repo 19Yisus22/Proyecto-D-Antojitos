@@ -171,11 +171,14 @@ async function cargarMarketing() {
                 const div = document.createElement("div");
                 div.className = `carousel-item ${carouselInner.children.length === 0 ? 'active' : ''}`;
                 div.innerHTML = `
-                    <img src="${item.imagen_url}" class="d-block w-100 carousel-img-render">
-                    <div class="caption-custom">
-                        <h6 class="fs-4">${item.titulo}</h6>
-                        <div class="divider mx-auto" style="width:60px; height:3px; background:#d35400; margin:10px auto;"></div>
-                        <p class="fs-6" style="font-weight: 300;">${item.descripcion}</p>
+                    <div class="carousel-img-wrapper">
+                        <img src="${item.imagen_url}" class="d-block w-100 carousel-img-render">
+                        <div class="carousel-overlay"></div>
+                    </div>
+                    <div class="carousel-caption-custom">
+                        <h6 class="carousel-title-animate">${item.titulo || ''}</h6>
+                        <div class="carousel-divider"></div>
+                        <p class="carousel-desc-animate">${item.descripcion || ''}</p>
                     </div>`;
                 carouselInner.appendChild(div);
             }
