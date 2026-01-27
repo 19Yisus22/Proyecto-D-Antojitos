@@ -103,17 +103,15 @@
     </div>
 
     {% else %}
-    <main class="flex-grow-1 d-flex align-items-center">
-        <div class="container text-center">
-            <div class="card p-5 border-0 shadow-lg rounded-4 mx-auto" style="max-width: 500px;">
-                <i class="bi bi-shield-lock-fill text-danger display-1 mb-3"></i>
-                <h2 class="fw-bold">Acceso Denegado</h2>
-                <p class="text-muted">Se requiere nivel Administrador.</p>
-                <a href="{{ url_for('inicio') }}" class="btn btn-primary w-100 py-2">Volver</a>
-            </div>
+    <main class="container py-5 text-center flex-grow-1">
+        <div class="card border-0 shadow-lg p-5">
+            <i class="bi bi-shield-lock-fill text-danger display-1 mb-4"></i>
+            <h2 class="fw-bold">Acceso Restringido</h2>
+            <p class="text-muted">Solo administradores pueden acceder a este panel.</p>
+            <a href="{{ url_for('inicio') }}" class="btn btn-primary px-5 py-2">Volver al Inicio</a>
         </div>
     </main>
-    <script>setTimeout(() => { window.location.href = "{{ url_for('inicio') }}"; }, 3000);</script>
+    <script>setTimeout(() => { window.location.href = "{{ url_for('inicio') }}"; }, 4000);</script>
     {% endif %}
 
     <div id="toastContainer" class="toast-container"></div>

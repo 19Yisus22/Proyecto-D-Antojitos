@@ -64,6 +64,99 @@ function showConfirmToast(msg, callback) {
     };
 }
 
+async function verificarAccesoAdmin() {
+    try {
+        const res = await fetch("/obtener_pedidos");
+        
+        if (res.status === 401 || res.status === 403) {
+            document.documentElement.innerHTML = `
+                <!DOCTYPE html>
+                <html lang="es">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Acceso Restringido</title>
+                    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+                    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+                    <style>
+                        body { background-color: #0d0d0d; margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
+                        .lock-container { height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: white; }
+                        .icon-lock { font-size: 7rem; color: #dc3545; margin-bottom: 1rem; animation: pulse 2s infinite; }
+                        .btn-exit { border-radius: 50px; padding: 10px 35px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+                        @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.05); opacity: 0.7; } 100% { transform: scale(1); opacity: 1; } }
+                    </style>
+                </head>
+                <body>
+                    <div class="lock-container">
+                        <i class="bi bi-shield-lock-fill icon-lock"></i>
+                        <h1 class="display-4 fw-bold">ACCESO DENEGADO</h1>
+                        <p class="text-muted fs-5 mb-4" style="max-width: 500px;">
+                            Lo sentimos, no cuentas con los permisos administrativos necesarios para visualizar este panel.
+                        </p>
+                        <div class="spinner-border text-danger mb-4" style="width: 3rem; height: 3rem;"></div>
+                        <p class="small text-uppercase text-secondary">Redirigiendo a zona segura...</p>
+                        <button onclick="window.location.href='/login'" class="btn btn-outline-danger btn-exit mt-2">Salir Ahora</button>
+                    </div>
+                </body>
+                </html>
+            `;
+            
+            setTimeout(() => {
+                window.location.href = "/login"; 
+            }, 4500);
+            
+            return false;
+        }
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+async function iniciarModuloPedidos() {
+    const tieneAcceso = await verificarAccesoAdmin();
+    if (!tieneAcceso) return;
+
+    inicializarSelectAnios();
+    await cargarPedidos();
+    escucharEventosTiempoReal();
+    
+    setInterval(() => cargarPedidos(true), 15000);
+
+    const btnPDF = document.getElementById("btnGenerarPDF");
+    if (btnPDF) {
+        btnPDF.addEventListener("click", generarReporteConfigurado);
+    }
+
+    const btnEliminar = document.getElementById("eliminarSeleccionados");
+    if (btnEliminar) {
+        btnEliminar.onclick = () => {
+            const sel = document.querySelectorAll(".pedido-card.seleccion");
+            if (sel.length === 0) return showMessage("Seleccione pedidos", true);
+            showConfirmToast(`¿Eliminar ${sel.length} pedidos?`, async () => {
+                for (const c of sel) {
+                    await fetch(`/eliminar_pedido/${c.id.replace("pedido-", "")}`, { method: "DELETE" });
+                }
+                showMessage("Eliminados correctamente");
+                await cargarPedidos();
+            });
+        };
+    }
+
+    const inputsFiltro = ["inputBusquedaNombre", "inputBusquedaCedula", "inputNumeroFactura", "selectAnio", "filtroEstado"];
+    inputsFiltro.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener(id.includes("select") || id.includes("filtro") ? "change" : "input", () => {
+                paginaActual = 1;
+                aplicarFiltros();
+            });
+        }
+    });
+}
+
+iniciarModuloPedidos();
+
 function generarNumeroFactura(idPedido, fecha) {
     const year = new Date(fecha).getFullYear();
     const key = `${year}-${idPedido}`;
@@ -640,6 +733,117 @@ inicializarSelectAnios();
 cargarPedidos();
 escucharEventosTiempoReal();
 setInterval(() => cargarPedidos(true), 15000);
+
+async function verificarAccesoAdmin() {
+    try {
+        const res = await fetch("/gestionar_productos");
+        
+        if (res.status === 401 || res.status === 403) {
+            document.documentElement.innerHTML = `
+                <head>
+                    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+                    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+                    <style>
+                        body { background: #000; color: white; height: 100vh; display: flex; align-items: center; justify-content: center; font-family: sans-serif; overflow: hidden; }
+                        .lock-box { text-align: center; border: 1px solid #333; padding: 3rem; border-radius: 20px; background: #0a0a0a; }
+                        .shield-icon { font-size: 5rem; color: #ff4757; animation: pulse 2s infinite; }
+                        @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.7; } 100% { transform: scale(1); opacity: 1; } }
+                    </style>
+                </head>
+                <body>
+                    <div class="lock-box shadow-lg">
+                        <i class="bi bi-shield-slash-fill shield-icon"></i>
+                        <h1 class="fw-bold mt-3">MÓDULO PROTEGIDO</h1>
+                        <p class="text-secondary">Se requiere nivel de acceso administrativo para esta sección.</p>
+                        <div class="spinner-border text-danger my-3" role="status"></div>
+                        <br>
+                        <button onclick="window.location.href='/'" class="btn btn-outline-danger mt-2 px-5">SALIR</button>
+                    </div>
+                </body>
+            `;
+            setTimeout(() => { window.location.href = "/"; }, 4000);
+            return false;
+        }
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+    const tieneAcceso = await verificarAccesoAdmin();
+    if (!tieneAcceso) return;
+
+    ajustarAtributosPrecio();
+    
+    const cached = localStorage.getItem('postresCache');
+    if (cached) {
+        postres = JSON.parse(cached);
+        renderPostres();
+    }
+    
+    await cargarPostres();
+    
+    setInterval(() => {
+        cargarPostres(true);
+    }, 10000);
+
+    if (btnAgregarPostre) {
+        btnAgregarPostre.addEventListener("click", () => {
+            indexActual = null;
+            agregarPostreForm.reset();
+            btnSubmitForm.innerHTML = '<i class="bi bi-check-lg me-2"></i>Subir Postre';
+            formAgregarPostre.classList.remove("d-none");
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    }
+
+    if (btnCancelar) {
+        btnCancelar.addEventListener("click", () => {
+            formAgregarPostre.classList.add("d-none");
+            agregarPostreForm.reset();
+            indexActual = null;
+        });
+    }
+
+    const btnEliminar = document.getElementById("btnEliminar");
+    if (btnEliminar) {
+        btnEliminar.onclick = async () => {
+            if (indexActual === null) return;
+            const p = postres[indexActual];
+            try {
+                const res = await fetch(`/eliminar_producto/${p.id_producto}`, { method: "DELETE" });
+                if (res.ok) {
+                    showMessage("Producto eliminado");
+                    modal.hide();
+                    indexActual = null;
+                    await cargarPostres();
+                } else {
+                    const err = await res.json();
+                    showMessage(err.error || "Error al eliminar", true);
+                }
+            } catch (e) {
+                showMessage("Error de conexión", true);
+            }
+        };
+    }
+
+    const btnEditar = document.getElementById("btnEditar");
+    if (btnEditar) {
+        btnEditar.onclick = () => {
+            if (indexActual === null) return;
+            const p = postres[indexActual];
+            document.getElementById("nombrePostre").value = p.nombre;
+            document.getElementById("precioPostre").value = p.precio;
+            document.getElementById("descripcionPostre").value = p.descripcion;
+            document.getElementById("stockPostre").value = p.stock;
+            btnSubmitForm.innerHTML = '<i class="bi bi-pencil-square me-2"></i>Actualizar Postre';
+            formAgregarPostre.classList.remove("d-none");
+            modal.hide();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+    }
+});
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {

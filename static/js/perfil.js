@@ -105,18 +105,36 @@ document.getElementById("formPerfil").addEventListener("submit", async e => {
     const btn = document.getElementById("btnActualizarPerfil");
     const originalText = btn.innerHTML;
     setLoading(btn, true, originalText);
+
+    inputs.forEach(i => i.disabled = false);
+
     const formData = new FormData(e.target);
     try {
-        const res = await fetch(`/actualizar_perfil/${USER_ID}`, { method: "PUT", body: formData });
+        const res = await fetch(`/actualizar_perfil/${USER_ID}`, { 
+            method: "PUT", 
+            body: formData 
+        });
         const data = await res.json();
+
         if (res.ok && data.ok) {
             showMessage("Perfil actualizado");
             setTimeout(() => location.reload(), 1000);
         } else {
-            showMessage(data.error || "Error", true);
+            let errorMsg = data.error || "Error al guardar cambios";
+            if (errorMsg.toLowerCase().includes("cedula") || errorMsg.toLowerCase().includes("cédula")) {
+                errorMsg = "La cédula ingresada ya está registrada por otro usuario";
+            } else if (errorMsg.toLowerCase().includes("correo") || errorMsg.toLowerCase().includes("email")) {
+                errorMsg = "El correo ingresado ya está en uso";
+            }
+            
+            showMessage(errorMsg, true);
+            
+            inputs.forEach(i => {
+                if (i.id === "correoPerfil" || i.readOnly) i.disabled = true;
+            });
         }
     } catch (error) {
-        showMessage("Error de conexión", true);
+        showMessage("Error de comunicación con el servidor", true);
     } finally {
         setLoading(btn, false, originalText);
     }

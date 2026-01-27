@@ -193,10 +193,22 @@ async function inicializarGoogle() {
                 ux_mode: 'popup',
                 auto_select: false
             });
-            google.accounts.id.renderButton(
-                document.getElementById("buttonDiv"),
-                { theme: "outline", size: "large", width: "350", shape: "pill" }
-            );
+
+            const buttonDiv = document.getElementById("buttonDiv");
+            if (buttonDiv) {
+                google.accounts.id.renderButton(
+                    buttonDiv,
+                    { 
+                        theme: "outline", 
+                        size: "large", 
+                        type: "standard",
+                        shape: "pill",
+                        text: "continue_with",
+                        logo_alignment: "left",
+                        width: buttonDiv.offsetWidth > 400 ? 350 : buttonDiv.offsetWidth
+                    }
+                );
+            }
         }
     } catch (err) { }
 }
@@ -275,5 +287,15 @@ if (linkInicio) {
     linkInicio.addEventListener("click", (e) => {
         e.preventDefault();
         window.location.href = "/inicio";
+    });
+}
+
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/static/js/workers/service-worker-perfil.js')
+        navigator.serviceWorker.register('/static/js/workers/service-worker-registro.js')
+        .then(reg => { console.log('SW OK'); })
+        .catch(err => { console.error('SW Error', err); });
     });
 }

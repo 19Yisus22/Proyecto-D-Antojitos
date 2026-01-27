@@ -306,13 +306,12 @@ async function guardarMarketing() {
             const fileInput = div.querySelector('input[type="file"]');
             const file = fileInput.files[0];
             
-            // Si hay archivo nuevo, se envía con una llave única vinculada al index
             if (file) {
                 formData.append(`${filePrefix}_${index}`, file);
             }
 
             metadata.push({
-                index: index, // Importante para que el backend asocie el archivo
+                index: index,
                 titulo: div.querySelector(".t-tit")?.value || "",
                 descripcion: div.querySelector(".t-des")?.value || "",
                 url_actual: div.querySelector("img").src,
@@ -458,6 +457,194 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             };
         }
+    }
+});
+
+async function verificarAccesoAdmin() {
+    try {
+        const res = await fetch("/api/admin/notificaciones");
+        
+        if (res.status === 401 || res.status === 403) {
+            document.documentElement.innerHTML = `
+                <head>
+                    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+                    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+                    <style>
+                        body { background: #000; color: white; height: 100vh; display: flex; align-items: center; justify-content: center; font-family: sans-serif; overflow: hidden; margin: 0; }
+                        .lock-box { text-align: center; border: 1px solid #333; padding: 3rem; border-radius: 24px; background: #0a0a0a; max-width: 500px; width: 90%; }
+                        .shield-icon { font-size: 5rem; color: #ff4757; animation: pulse 2s infinite; display: block; }
+                        @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.05); opacity: 0.7; } 100% { transform: scale(1); opacity: 1; } }
+                        .btn-exit { border: 1px solid #ff4757; color: #ff4757; transition: all 0.3s; text-decoration: none; padding: 10px 30px; border-radius: 10px; display: inline-block; margin-top: 20px; }
+                        .btn-exit:hover { background: #ff4757; color: white; }
+                    </style>
+                </head>
+                <body>
+                    <div class="lock-box shadow-lg">
+                        <i class="bi bi-shield-lock-fill shield-icon"></i>
+                        <h1 class="fw-bold mt-4 mb-2" style="letter-spacing: -1px;">ACCESO RESTRINGIDO</h1>
+                        <p class="text-secondary mb-4">No tienes los permisos necesarios para gestionar el marketing del sitio.</p>
+                        <div class="spinner-border text-danger mb-4" style="width: 1.5rem; height: 1.5rem;" role="status"></div>
+                        <br>
+                        <a href="/" class="btn-exit fw-bold">VOLVER AL INICIO</a>
+                    </div>
+                </body>
+            `;
+            
+            setTimeout(() => { 
+                window.location.href = "/"; 
+            }, 3500);
+            
+            return false;
+        }
+        return true;
+    } catch (e) {
+        console.error("Error en verificación de seguridad");
+        return false;
+    }
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+    const tieneAcceso = await verificarAccesoAdmin();
+    
+    if (!tieneAcceso) return;
+
+    const esAdmin = document.getElementById("carruselContainer") !== null;
+    if (esAdmin) {
+        cargarPublicidadActiva();
+        cargarAlertasActivas();
+        initDrag("carruselContainer");
+        initDrag("seccionesContainer");
+        initDrag("cintaContainer");
+        document.getElementById("btnGuardarMarketing")?.addEventListener("click", guardarMarketing);
+        document.getElementById("btnPublicarNotificacion")?.addEventListener("click", crearNotificacion);
+
+        const inputNotificacion = document.getElementById("archivoNotificacion");
+        if (inputNotificacion) {
+            inputNotificacion.onchange = function() {
+                const file = this.files[0];
+                if (validarArchivo(file)) {
+                    const reader = new FileReader();
+                    reader.onload = e => {
+                        const preview = document.getElementById("previewNotificacion");
+                        const img = document.getElementById("previewNotificacionImg");
+                        if (img) img.src = e.target.result;
+                        if (preview) preview.style.display = "block";
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+        }
+    }
+});
+
+async function verificarAccesoAdmin() {
+    try {
+        const res = await fetch("/gestionar_productos");
+        
+        if (res.status === 401 || res.status === 403) {
+            document.documentElement.innerHTML = `
+                <head>
+                    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+                    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+                    <style>
+                        body { background: #000; color: white; height: 100vh; display: flex; align-items: center; justify-content: center; font-family: sans-serif; overflow: hidden; }
+                        .lock-box { text-align: center; border: 1px solid #333; padding: 3rem; border-radius: 20px; background: #0a0a0a; }
+                        .shield-icon { font-size: 5rem; color: #ff4757; animation: pulse 2s infinite; }
+                        @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.7; } 100% { transform: scale(1); opacity: 1; } }
+                    </style>
+                </head>
+                <body>
+                    <div class="lock-box shadow-lg">
+                        <i class="bi bi-shield-slash-fill shield-icon"></i>
+                        <h1 class="fw-bold mt-3">MÓDULO PROTEGIDO</h1>
+                        <p class="text-secondary">Se requiere nivel de acceso administrativo para esta sección.</p>
+                        <div class="spinner-border text-danger my-3" role="status"></div>
+                        <br>
+                        <button onclick="window.location.href='/'" class="btn btn-outline-danger mt-2 px-5">SALIR</button>
+                    </div>
+                </body>
+            `;
+            setTimeout(() => { window.location.href = "/"; }, 4000);
+            return false;
+        }
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+    const tieneAcceso = await verificarAccesoAdmin();
+    if (!tieneAcceso) return;
+
+    ajustarAtributosPrecio();
+    
+    const cached = localStorage.getItem('postresCache');
+    if (cached) {
+        postres = JSON.parse(cached);
+        renderPostres();
+    }
+    
+    await cargarPostres();
+    
+    setInterval(() => {
+        cargarPostres(true);
+    }, 10000);
+
+    if (btnAgregarPostre) {
+        btnAgregarPostre.addEventListener("click", () => {
+            indexActual = null;
+            agregarPostreForm.reset();
+            btnSubmitForm.innerHTML = '<i class="bi bi-check-lg me-2"></i>Subir Postre';
+            formAgregarPostre.classList.remove("d-none");
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    }
+
+    if (btnCancelar) {
+        btnCancelar.addEventListener("click", () => {
+            formAgregarPostre.classList.add("d-none");
+            agregarPostreForm.reset();
+            indexActual = null;
+        });
+    }
+
+    const btnEliminar = document.getElementById("btnEliminar");
+    if (btnEliminar) {
+        btnEliminar.onclick = async () => {
+            if (indexActual === null) return;
+            const p = postres[indexActual];
+            try {
+                const res = await fetch(`/eliminar_producto/${p.id_producto}`, { method: "DELETE" });
+                if (res.ok) {
+                    showMessage("Producto eliminado");
+                    modal.hide();
+                    indexActual = null;
+                    await cargarPostres();
+                } else {
+                    const err = await res.json();
+                    showMessage(err.error || "Error al eliminar", true);
+                }
+            } catch (e) {
+                showMessage("Error de conexión", true);
+            }
+        };
+    }
+
+    const btnEditar = document.getElementById("btnEditar");
+    if (btnEditar) {
+        btnEditar.onclick = () => {
+            if (indexActual === null) return;
+            const p = postres[indexActual];
+            document.getElementById("nombrePostre").value = p.nombre;
+            document.getElementById("precioPostre").value = p.precio;
+            document.getElementById("descripcionPostre").value = p.descripcion;
+            document.getElementById("stockPostre").value = p.stock;
+            btnSubmitForm.innerHTML = '<i class="bi bi-pencil-square me-2"></i>Actualizar Postre';
+            formAgregarPostre.classList.remove("d-none");
+            modal.hide();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
     }
 });
 

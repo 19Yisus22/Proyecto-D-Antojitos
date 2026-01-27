@@ -204,6 +204,7 @@ def logout():
     session.clear()
     return redirect("/login")
 
+
 # APARTADO DE PERFILES
 
 @app.route("/mi_perfil", methods=["GET", "POST"])
@@ -241,39 +242,49 @@ def mi_perfil():
 
 @app.route("/actualizar_perfil/<id_cliente>", methods=["PUT", "POST"])
 def actualizar_perfil(id_cliente):
-
     user_id = session.get("user_id")
 
     if not user_id:
         return jsonify({"ok": False, "error": "No autorizado"}), 401
+
     user_res = supabase.table("usuarios").select("*").eq("id_cliente", id_cliente).single().execute()
 
     if not user_res.data:
         return jsonify({"ok": False, "error": "Usuario no encontrado"}), 404
+
     data = request.form if request.form else request.json
-    campos_actualizar = {
-        'nombre': data.get('nombrePerfil','').strip(),
-        'apellido': data.get('apellidoPerfil','').strip(),
-        'telefono': data.get('telefonoPerfil','').strip(),
-        'correo': data.get('correoPerfil','').strip().lower(),
-        'direccion': data.get('direccionPerfil','').strip(),
-        'cedula': data.get('cedulaPerfil','').strip(),
-        'metodo_pago': data.get('metodoPagoPerfil','').strip()}
     
+    campos_actualizar = {
+        'nombre': data.get('nombrePerfil', '').strip(),
+        'apellido': data.get('apellidoPerfil', '').strip(),
+        'telefono': data.get('telefonoPerfil', '').strip(),
+        'correo': data.get('correoPerfil', '').strip().lower(),
+        'direccion': data.get('direccionPerfil', '').strip(),
+        'cedula': data.get('cedulaPerfil', '').strip(),
+        'metodo_pago': data.get('metodoPagoPerfil', '').strip()
+    }
+
     imagen_file = request.files.get("imagen_url")
 
     if imagen_file and imagen_file.filename:
         url_imagen = upload_image_to_cloudinary(imagen_file, folder="usuarios", public_id=f"foto_perfil_{id_cliente}")
         campos_actualizar["imagen_url"] = url_imagen
-    campos_actualizar = {k:v for k,v in campos_actualizar.items() if v}
+
+    campos_actualizar = {k: v for k, v in campos_actualizar.items() if v is not None and v != ""}
 
     if not campos_actualizar:
-        return jsonify({"ok": False, "error": "No se enviaron datos"}), 400
-    supabase.table("usuarios").update(campos_actualizar).eq("id_cliente", id_cliente).execute()
-    user_res = supabase.table("usuarios").select("*, roles(nombre_role)").eq("id_cliente", id_cliente).single().execute()
-    usuario = user_res.data
-    usuario["imagen_url"] = usuario.get("imagen_url") or "/static/default_icon_profile.png"
-    return jsonify({"ok": True, "usuario": usuario})
+        return jsonify({"ok": False, "error": "No hay datos válidos para actualizar"}), 400
+
+    try:
+        supabase.table("usuarios").update(campos_actualizar).eq("id_cliente", id_cliente).execute()
+        
+        user_res = supabase.table("usuarios").select("*, roles(nombre_role)").eq("id_cliente", id_cliente).single().execute()
+        usuario = user_res.data
+        usuario["imagen_url"] = usuario.get("imagen_url") or "/static/default_icon_profile.png"
+        
+        return jsonify({"ok": True, "usuario": usuario})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 @app.route("/actualizar_rol_usuario", methods=["PUT"])
 def actualizar_rol_usuario():
@@ -1326,7 +1337,7 @@ if __name__ == "__main__":
     port = 8000
     local_ip = get_local_ip()
 
-    debug_mode = False
+    debug_mode = True
 
     if debug_mode:
         print("⚡ Ejecutando en modo DEBUG con servidor de desarrollo de Flask")
