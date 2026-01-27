@@ -3,11 +3,10 @@ from waitress import serve
 from flask_cors import CORS
 from dotenv import load_dotenv
 from supabase import create_client
-from google.oauth2 import id_token
 from datetime import datetime, timezone, timedelta
-from google.auth.transport import requests as google_requests
+from google.auth.transport import requests
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
-import os, uuid, socket, secrets, logging, hashlib, websockets, cloudinary, cloudinary.uploader, json
+import os, uuid, socket, secrets, logging, hashlib, cloudinary, cloudinary.uploader, json
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
