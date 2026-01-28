@@ -20,7 +20,6 @@
             z-index: 10;
             color: #a67c83;
         }
-        .modal-content { border-radius: 25px; border: none; }
         .btn-pasteleria { background-color: #f1a7b9; color: white; border: none; }
         .btn-pasteleria:hover { background-color: #d85a76; color: white; }
     </style>
@@ -47,15 +46,12 @@
                     <label for="correo" class="form-label small fw-semibold">Correo Electrónico</label>
                     <input type="email" id="correo" name="correo" class="form-control" placeholder="ejemplo@correo.com" required>
                 </div>
-                <div class="mb-1 text-start">
+                <div class="mb-4 text-start">
                     <label for="contrasena" class="form-label small fw-semibold">Contraseña</label>
                     <div class="password-container">
                         <input type="password" id="contrasena" name="contrasena" class="form-control" placeholder="••••••••" required>
                         <i class="bi bi-eye toggle-password" id="togglePassword"></i>
                     </div>
-                </div>
-                <div class="mb-3 text-end">
-                    <a href="#" class="small text-decoration-none fw-bold" style="color: #d85a76;" data-bs-toggle="modal" data-bs-target="#modalRecuperar">¿Olvidaste tu contraseña?</a>
                 </div>
                 <button type="submit" id="btnSubmitLogin" class="btn btn-pasteleria w-100 py-2 fw-bold shadow-sm">
                     Entrar
@@ -65,35 +61,6 @@
             <div class="mt-4">
                 <p class="mb-1 small">¿No tiene cuenta? <a href="/registro" id="linkRegistro" class="text-decoration-none fw-bold" style="color: #d85a76;">Regístrese</a></p>
                 <p class="small">Ir al <a href="/inicio" id="linkInicio" class="text-decoration-none fw-bold text-secondary">Inicio</a></p>
-            </div>
-        </div>
-    </div>
-
-    <div class="modal fade" id="modalRecuperar" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content shadow-lg">
-                <div class="modal-header border-0">
-                    <h5 class="modal-title fw-bold" style="color: #5d4037;">Recuperar Contraseña</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body p-4 text-center">
-                    <div id="stepEmail">
-                        <p class="small text-muted mb-4">Ingresa tu correo registrado para enviarte un código de verificación.</p>
-                        <input type="email" id="emailRecuperar" class="form-control mb-3 text-center" placeholder="tu@correo.com">
-                        <button type="button" class="btn btn-pasteleria w-100 fw-bold" onclick="solicitarCodigo()">Enviar Código</button>
-                    </div>
-                    <div id="stepCode" class="d-none">
-                        <p class="small text-success fw-bold mb-3">¡Código enviado! Revisa tu bandeja de entrada.</p>
-                        <div class="mb-3">
-                            <input type="text" id="inputCodigo" class="form-control text-center fw-bold fs-3" maxlength="6" placeholder="000000" style="letter-spacing: 5px;">
-                        </div>
-                        <div class="mb-3 text-start">
-                            <label class="small fw-semibold">Nueva Contraseña</label>
-                            <input type="password" id="nuevaClave" class="form-control" placeholder="Mínimo 4 caracteres">
-                        </div>
-                        <button type="button" class="btn btn-pasteleria w-100 fw-bold" onclick="verificarYCambiar()">Restablecer</button>
-                    </div>
-                </div>
             </div>
         </div>
     </div>

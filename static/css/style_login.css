@@ -15,51 +15,79 @@ body {
     width: 400px;
     max-width: 90%;
     padding: 2rem;
-    border-radius: 15px;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+    border-radius: 20px;
+    box-shadow: 0 15px 35px rgba(93, 64, 55, 0.15);
     background-color: #ffffff;
-    animation: slideIn 0.8s ease forwards;
+    animation: fadeInScale 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
     text-align: center;
 }
 
-@keyframes slideIn {
+@keyframes fadeInScale {
     0% {
-        transform: translateY(-50px);
+        transform: scale(0.95) translateY(20px);
         opacity: 0;
     }
     100% {
-        transform: translateY(0);
+        transform: scale(1) translateY(0);
         opacity: 1;
     }
 }
 
-input.form-control {
+#buttonDiv {
     transition: all 0.3s ease;
+    animation: pulseGoogle 2s infinite;
+    border-radius: 25px;
+}
+
+@keyframes pulseGoogle {
+    0% { box-shadow: 0 0 0 0 rgba(241, 167, 185, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(241, 167, 185, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(241, 167, 185, 0); }
+}
+
+input.form-control {
+    border-radius: 10px;
+    border: 1.5px solid #eee;
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 input.form-control:focus {
-    border-color: #d6336c;
-    box-shadow: 0 0 5px rgba(214,51,108,0.5);
+    border-color: #f1a7b9;
+    box-shadow: 0 0 0 0.25rem rgba(241, 167, 185, 0.25);
 }
 
-button.btn {
-    transition: all 0.3s ease;
+button.btn-pasteleria {
+    border-radius: 12px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-button.btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(214,51,108,0.3);
+button.btn-pasteleria:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(216, 90, 118, 0.3);
 }
 
-.logo-container img.logo {
-    width: 60px;
-    height: 60px;
-    margin-bottom: 1rem;
+.logo-container img {
+    width: 70px;
+    animation: float 4s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
 }
 
 #toastContainer {
     position: fixed;
-    top: 20px;
+    bottom: 20px;
     left: 20px;
-    z-index: 1055;
+    z-index: 1080;
+}
+
+.custom-toast {
+    animation: toastSlideIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes toastSlideIn {
+    0% { transform: translateX(-100%); opacity: 0; }
+    100% { transform: translateX(0); opacity: 1; }
 }

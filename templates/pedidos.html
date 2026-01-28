@@ -13,9 +13,11 @@
 </head>
 <body>
 
-    {% include 'navbar.html' %}
-    {% if session.get('user_id') and session.get('rol') == 'admin' %}
+    <div id="notificacion-container" style="position: fixed; top: 20px; right: 20px; z-index: 10000;"></div>
 
+    {% include 'navbar.html' %}
+    
+    {% if session.get('user_id') and session.get('rol') == 'admin' %}
     <main class="container mt-4 flex-grow-1">
         <div class="card-title-marketing mb-5 text-center d-block">
             <h3 class="display-6 fw-bold m-0"><i class="bi bi-clipboard-check"></i> Panel de Pedidos</h3>
@@ -67,9 +69,6 @@
                             <i class="bi bi-file-earmark-pdf"></i> PDF Reporte
                         </button>
                     </div>
-                    <button id="eliminarSeleccionados" class="btn btn-danger fw-bold shadow-sm">
-                        <i class="bi bi-trash"></i> Borrar Seleccionados
-                    </button>
                 </div>
             </div>
         </div>
@@ -104,13 +103,6 @@
                         <i class="bi bi-info-circle-fill me-2 fs-5"></i>
                         <div>
                             Este reporte incluirá un <strong>resumen totalizado</strong> de ventas y un <strong>gráfico estadístico</strong> de estados.
-                        </div>
-                    </div>
-
-                    <div class="alert alert-warning d-flex align-items-center py-2 mb-3" style="font-size: 0.85rem;">
-                        <i class="bi bi-calendar-event me-2 fs-5"></i>
-                        <div>
-                            <strong>Cómo descargar?</strong> Si selecciona solo el año, se obtendrá el reporte anual. Si selecciona mes y año, el reporte será específico de ese periodo.
                         </div>
                     </div>
 

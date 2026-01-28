@@ -121,58 +121,6 @@ body {
 .toast-confirm { border-left: 5px solid var(--warning-bg); }
 .toast-success { border-left: 5px solid var(--success-bg); }
 .toast-error { border-left: 5px solid var(--danger-bg); }
-.status-border-primary { border-left: 5px solid #007bff; }
-.status-border-success { border-left: 5px solid var(--success-bg); }
-.status-border-danger { border-left: 5px solid var(--danger-bg); }
-.status-border-info { border-left: 5px solid var(--info-bg); }
-
-.btn-close-toast {
-    cursor: pointer;
-    font-size: 0.8rem;
-    color: rgba(255,255,255,0.7);
-}
-
-.toast-publicidad {
-    background: #121212;
-    color: white;
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 12px;
-    padding: 10px;
-    margin-bottom: 10px;
-    min-width: 330px;
-    transition: all 0.5s ease;
-    animation: slideIn 0.4s ease forwards;
-}
-
-.toast-publicidad.hide {
-    opacity: 0;
-    transform: scale(0.9);
-}
-
-.toast-pub-content {
-    display: flex;
-    align-items: center;
-}
-
-.img-pub {
-    width: 55px;
-    height: 55px;
-    object-fit: cover;
-    border-radius: 8px;
-    margin-right: 15px;
-}
-
-.toast-publicidad.success .icon-status,
-.toast-publicidad.success .title-pub { color: #198754; }
-.toast-publicidad.error .icon-status,
-.toast-publicidad.error .title-pub { color: #dc3545; }
-
-.btn-close-pub {
-    background: none;
-    border: none;
-    color: white;
-    font-size: 1.2rem;
-}
 
 .factura-card {
     background: #ffffff;
@@ -188,31 +136,38 @@ body {
     transform: translateY(-3px);
 }
 
-.factura-card.anulada-card {
-    opacity: 0.7;
-}
-
 .factura-header {
     background: #fff;
     padding: 1.2rem;
     border-bottom: 1px dashed #dee2e6;
 }
 
-.factura-icon-wrapper {
-    width: 45px;
-    height: 45px;
-    background: var(--dark);
-    color: white;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-right: 1rem;
-}
-
 .factura-body {
     padding: 1.2rem;
     background: #fff;
+}
+
+.qr-container img {
+    transition: transform 0.3s ease;
+}
+
+.qr-container img:hover {
+    transform: scale(1.05);
+}
+
+.btn-copy-sm {
+    padding: 2px 6px;
+    font-size: 0.75rem;
+    color: var(--primary);
+    background: #fff4ed;
+    border: 1px solid #ffd8bf;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.btn-copy-sm:hover {
+    background: var(--primary);
+    color: white;
 }
 
 .factura-footer {
@@ -230,18 +185,6 @@ body {
     font-size: 0.9rem;
 }
 
-.detail-label {
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    color: #6c757d;
-    font-weight: bold;
-    letter-spacing: 1px;
-    margin-bottom: 0.5rem;
-}
-
-.total-label { font-size: 0.7rem; color: #6c757d; }
-.total-value { font-weight: bold; font-size: 1.25rem; color: var(--primary); }
-
 .badge-status {
     padding: 5px 12px;
     border-radius: 50px;
@@ -250,9 +193,10 @@ body {
     text-transform: uppercase;
 }
 
-.status-emitida { background-color: var(--info-soft); color: #055160; }
-.status-pagada { background-color: var(--success-soft); color: #0f5132; }
-.status-anulada { background-color: var(--danger-soft); color: #842029; }
+.bg-primary { background-color: var(--info-bg) !important; color: white; }
+.bg-success { background-color: var(--success-bg) !important; color: white; }
+.bg-danger { background-color: var(--danger-bg) !important; color: white; }
+.bg-info { background-color: var(--info-bg) !important; color: white; }
 
 #contadorCarritoBadge {
     display: none;
@@ -294,7 +238,7 @@ footer, .footer {
     color: #fff;
     padding: 40px 0 20px 0;
     margin-top: auto;
-    border-top: 4px solid var(--primary-color, #d35400);
+    border-top: 4px solid var(--primary);
 }
 
 .footer-bottom {
@@ -304,24 +248,6 @@ footer, .footer {
     color: rgba(255, 255, 255, 0.6);
 }
 
-.footer h5 {
-    color: var(--primary-color, #d35400);
-    font-weight: 700;
-    margin-bottom: 20px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-.footer a {
-    color: rgba(255, 255, 255, 0.8);
-    text-decoration: none;
-    transition: all 0.3s ease;
-}
-
-.footer a:hover {
-    color: var(--primary-color, #d35400);
-}
-
 @media (max-width: 768px) {
     .custom-table-carrito {
         display: block;
@@ -329,7 +255,7 @@ footer, .footer {
         white-space: nowrap;
     }
 
-    .toast-publicidad, .custom-toast {
+    .custom-toast {
         min-width: auto;
         width: 90%;
         margin-left: auto;

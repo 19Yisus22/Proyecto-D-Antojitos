@@ -11,6 +11,7 @@ DROP TABLE IF EXISTS roles_permisos CASCADE;
 DROP TABLE IF EXISTS permisos CASCADE;
 DROP TABLE IF EXISTS roles CASCADE;
 DROP TABLE IF EXISTS publicidad CASCADE;
+DROP TABLE IF EXISTS metodos_pago CASCADE;
 
 CREATE TABLE roles (
     id_role UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -84,13 +85,25 @@ CREATE TABLE facturas (
     id_factura UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     id_pedido UUID REFERENCES pedidos(id_pedido) ON DELETE CASCADE,
     id_cliente UUID REFERENCES usuarios(id_cliente) ON DELETE CASCADE,
+    id_pago UUID REFERENCES metodos_pago(id_pago) ON DELETE SET NULL, -- LLAVE FORÁNEA
     numero_factura SERIAL UNIQUE,
     fecha_emision TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     subtotal NUMERIC(12,2) NOT NULL,
     total NUMERIC(12,2) NOT NULL,
     metodo_pago TEXT CHECK (metodo_pago IN ('Efectivo','Transferencia')),
-    estado TEXT DEFAULT 'Emitida' CHECK (estado IN ('Emitida','Anulada','Pagada')),
+    estado TEXT DEFAULT 'Emitida' CHECK (estado IN ('Emitida', 'Anulada', 'Pagada')),
     cedula TEXT
+);
+
+CREATE TABLE metodos_pago (
+    id_pago UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    entidad TEXT NOT NULL CHECK (entidad IN ('Nequi', 'Daviplata', 'Bancolombia', 'NuBank')),
+    tipo_cuenta TEXT NOT NULL CHECK (tipo_cuenta IN ('Billetera Digital', 'Ahorros', 'Corriente')),
+    numero TEXT NOT NULL,
+    titular TEXT NOT NULL,
+    qr_url TEXT,
+    estado BOOLEAN DEFAULT TRUE,
+    fecha_creacion TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 CREATE TABLE pedido_detalle (
@@ -265,6 +278,18 @@ FOR SELECT
 USING (estado = true);
 
 CREATE INDEX idx_publicidad_tipo_estado ON publicidad(tipo, estado);
+
+ALTER TABLE metodos_pago ENABLE ROW LEVEL SECURITY;
+ALTER TABLE facturas ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Lectura pública metodos" ON metodos_pago FOR SELECT USING (estado = true);
+CREATE POLICY "Admin CRUD metodos" ON metodos_pago FOR ALL USING (public.es_admin());
+
+CREATE POLICY "Admin CRUD facturas" ON facturas FOR ALL USING (public.es_admin());
+CREATE POLICY "Cliente ver sus facturas" ON facturas FOR SELECT USING (id_cliente = auth.uid());
+
+CREATE INDEX idx_facturas_id_pago ON facturas(id_pago);
+CREATE INDEX idx_metodos_pago_id_pago ON metodos_pago(id_pago);
 
 INSERT INTO roles (nombre_role, descripcion) VALUES 
 ('cliente', 'Acceso estándar'),

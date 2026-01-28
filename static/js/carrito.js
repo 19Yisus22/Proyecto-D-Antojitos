@@ -4,6 +4,7 @@ const itemsPorPagina = 5;
 let productosCarrito = [];
 let facturasLocalesCache = [];
 let catalogoLocalCache = [];
+let metodosPagoCache = [];
 
 function showConfirmToast(msg, callback) {
     const container = document.getElementById('toastContainer');
@@ -134,6 +135,85 @@ function mostrarToastPublicidad(imagen, titulo, descripcion, isError = false) {
     };
     t.querySelector('.btn-close').onclick = remove;
     setTimeout(remove, 5000);
+}
+
+async function cargarMetodosPago() {
+    try {
+        const res = await fetch("/obtener_metodos_pago");
+        if (res.ok) {
+            const data = await res.json();
+            metodosPagoCache = data.metodos || [];
+        }
+    } catch (e) {
+        console.error("Error cargando métodos de pago:", e);
+    }
+}
+
+function abrirModalPago(facturaNum, total) {
+    const modalElement = document.getElementById('modalPago');
+    const modalBody = document.getElementById("modalPagoBody");
+    if (!modalElement || !modalBody) return;
+
+    if (!metodosPagoCache || metodosPagoCache.length === 0) {
+        modalBody.innerHTML = `
+            <div class="text-center p-5">
+                <i class="bi bi-wallet2 fs-1 text-muted mb-3 d-block"></i>
+                <h5 class="text-secondary">Sin métodos registrados</h5>
+                <p class="small text-muted">No hay cuentas de pago disponibles en este momento.</p>
+            </div>`;
+    } else {
+        modalBody.innerHTML = `
+            <div class="text-center mb-4 border-bottom pb-3">
+                <p class="text-muted mb-1 small text-uppercase fw-bold">Referencia de Pago</p>
+                <h4 class="fw-bold text-dark mb-1">${facturaNum}</h4>
+                <div class="fs-3 fw-bold text-primary">${total}</div>
+            </div>
+            <div class="row g-4 justify-content-center">
+                ${metodosPagoCache.map(m => `
+                    <div class="col-12 col-md-6">
+                        <div class="card h-100 border-0 shadow-sm rounded-4 overflow-hidden">
+                            <div class="card-header bg-dark text-white text-center py-2 border-0">
+                                <span class="fw-bold small text-uppercase">${m.entidad} - ${m.tipo_cuenta}</span>
+                            </div>
+                            <div class="card-body p-3 text-center bg-white">
+                                <div class="mb-3">
+                                    <img src="${m.qr_url || '/static/uploads/no-qr.png'}" 
+                                         class="img-fluid rounded-3 border p-2 bg-light shadow-sm" 
+                                         style="max-height: 200px; width: 100%; object-fit: contain;"
+                                         onerror="this.src='/static/uploads/no-qr.png'">
+                                </div>
+                                <div class="bg-light rounded-3 p-3 border">
+                                    <p class="text-muted small mb-1 text-uppercase fw-bold" style="font-size: 0.65rem;">Titular de la cuenta</p>
+                                    <p class="mb-2 fw-semibold text-dark">${m.titular}</p>
+                                    
+                                    <hr class="my-2 opacity-25">
+                                    
+                                    <p class="text-muted small mb-1 text-uppercase fw-bold" style="font-size: 0.65rem;">Número / Celular</p>
+                                    <div class="d-flex align-items-center justify-content-center gap-2">
+                                        <span class="fs-5 fw-bold text-primary text-break">${m.numero}</span>
+                                        <button class="btn btn-primary btn-sm rounded-circle d-flex align-items-center justify-content-center" 
+                                                style="width: 32px; height: 32px;"
+                                                onclick="navigator.clipboard.writeText('${m.numero}').then(() => showMessage('Número copiado al portapapeles'))"
+                                                title="Copiar número">
+                                            <i class="bi bi-clipboard"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+            <div class="mt-4 p-3 bg-primary bg-opacity-10 border border-primary border-dashed rounded-3 text-center">
+                <p class="small text-primary mb-0 fw-medium">
+                    <i class="bi bi-info-circle-fill me-2"></i>Realiza la transferencia y adjunta el comprobante vía WhatsApp o al correo <strong>d.antojitos1958@gmail.com</strong>
+                </p>
+            </div>
+        `;
+    }
+    
+    const bootstrapModal = bootstrap.Modal.getOrCreateInstance(modalElement);
+    bootstrapModal.show();
 }
 
 async function verificarCambiosCatalogoYCarrito() {
@@ -450,7 +530,8 @@ async function finalizarCompra() {
 }
 
 async function monitorearCambiosFacturas() {
-    const cedula = document.getElementById("buscarFactura")?.value.trim();
+    const inputBuscar = document.getElementById("buscarFactura");
+    const cedula = inputBuscar ? inputBuscar.value.trim() : "";
     if (!cedula) return;
 
     try {
@@ -472,7 +553,7 @@ async function monitorearCambiosFacturas() {
         facturasLocalesCache = facturasServidor;
         facturasActuales = facturasServidor
             .filter(f => !ocultas.includes(f.id_factura))
-            .sort((a,b) => new Date(b.fecha_emision) - new Date(a.fecha_emision));
+            .sort((a, b) => new Date(b.fecha_emision) - new Date(a.fecha_emision));
             
         mostrarFacturasBuscadas();
 
@@ -481,14 +562,17 @@ async function monitorearCambiosFacturas() {
     }
 }
 
+function generarReferenciaVisual(f) {
+    const fechaEmi = new Date(f.fecha_emision);
+    const anio = fechaEmi.getFullYear();
+    const idReal = f.id_factura;
+    return `F-${anio}-${idReal}`;
+}
+
 function lanzarNotificacionMultidispositivo(fObj, estado) {
     playNotificationSound();
     
-    const fechaEmi = new Date(fObj.fecha_emision);
-    const anio = fechaEmi.getFullYear();
-    const numRef = fObj.numero_factura.toString().split('-').pop();
-    const facturaFormateada = `F-${anio}-${numRef}`;
-
+    const facturaFormateada = generarReferenciaVisual(fObj);
     let configuracion = {
         color: "primary",
         icono: "bi-info-circle-fill",
@@ -497,7 +581,7 @@ function lanzarNotificacionMultidispositivo(fObj, estado) {
 
     if (estado === "Anulada") {
         configuracion = { color: "danger", icono: "bi-x-circle-fill", titulo: "Pedido Anulado" };
-    } else if (estado === "Pagada" || estado === "Finalizado") {
+    } else if (estado === "Pagada" || estado === "Pagado") {
         configuracion = { color: "success", icono: "bi-check-circle-fill", titulo: "Pago Confirmado" };
     } else if (estado === "Emitida" || estado === "Emitido") {
         configuracion = { color: "info", icono: "bi-send-fill", titulo: "Pedido Emitido" };
@@ -538,32 +622,60 @@ function lanzarNotificacionMultidispositivo(fObj, estado) {
     setTimeout(remove, 7000);
 }
 
+function generarNumeroFactura(idPedido, fecha) {
+    const year = new Date(fecha).getFullYear();
+    const key = `${year}-${idPedido}`;
+    let contadorFacturasPorAnio = JSON.parse(localStorage.getItem("contadorFacturasPorAnio") || "{}");
+    
+    if (!contadorFacturasPorAnio[key]) {
+        if (!contadorFacturasPorAnio[year]) {
+            contadorFacturasPorAnio[year] = 0;
+        }
+        contadorFacturasPorAnio[year]++;
+        contadorFacturasPorAnio[key] = contadorFacturasPorAnio[year];
+        localStorage.setItem("contadorFacturasPorAnio", JSON.stringify(contadorFacturasPorAnio));
+    }
+    return `F-${year}-${contadorFacturasPorAnio[key]}`;
+}
+
 function mostrarFacturasBuscadas() {
     const container = document.getElementById("facturasContainer");
     if (!container) return;
     container.innerHTML = "";
     
-    const filtro = document.getElementById("filtroEstado");
-    const filter = filtro ? filtro.value : "";
+    const filtroEstado = document.getElementById("filtroEstado")?.value || "";
+    const busquedaNombre = document.getElementById("inputBusquedaNombre")?.value.toLowerCase().trim() || "";
+    const busquedaCedula = document.getElementById("inputBusquedaCedula")?.value.trim() || "";
     
-    let filtradas = facturasActuales;
-    if (filter && filter !== "") filtradas = facturasActuales.filter(f => f.estado === filter);
+    let filtradas = facturasActuales.filter(f => {
+        const matchEstado = filtroEstado === "" || f.estado === filtroEstado;
+        const usuario = f.usuarios || {};
+        const nombreCompleto = `${usuario.nombre || ''} ${usuario.apellido || ''}`.toLowerCase();
+        const cedulaUsuario = String(usuario.cedula || '');
+
+        const matchNombre = busquedaNombre === "" || nombreCompleto.includes(busquedaNombre);
+        const matchCedula = busquedaCedula === "" || cedulaUsuario.includes(busquedaCedula);
+
+        return matchEstado && matchNombre && matchCedula;
+    });
     
     const paginadas = filtradas.slice((paginaActual - 1) * itemsPorPagina, paginaActual * itemsPorPagina);
 
     if (paginadas.length === 0) {
-        container.innerHTML = '<div class="text-center p-5 text-muted bg-white rounded-4 shadow-sm"><i class="bi bi-search fs-1"></i><p class="mt-2">No encontramos registros</p></div>';
+        container.innerHTML = '<div class="text-center p-5 text-muted bg-white rounded-4 shadow-sm"><i class="bi bi-search fs-1"></i><p class="mt-2">No se encontraron registros</p></div>';
         return;
     }
 
-    paginadas.forEach((f, index) => {
+    paginadas.forEach((f) => {
         const card = document.createElement("div");
-        card.className = `factura-card ${f.estado === 'Anulada' ? 'opacity-75' : ''} fade-in-item`;
         
-        const fechaEmi = new Date(f.fecha_emision);
-        const anio = fechaEmi.getFullYear();
-        const numeroEntero = filtradas.length - ((paginaActual - 1) * itemsPorPagina + index);
-        const facturaFormateada = `F-${anio}-${numeroEntero}`;
+        const esPagada = (f.estado === 'Pagado' || f.estado === 'Pagada' || f.estado === 'Finalizado' || f.estado === 'Enviado');
+        const esAnulada = (f.estado === 'Anulada' || f.estado === 'Cancelado');
+        const esEstadoFinal = esPagada || esAnulada;
+        
+        card.className = `factura-card ${esEstadoFinal ? 'factura-bloqueada' : ''} fade-in-item`;
+        
+        const facturaFormateada = generarNumeroFactura(f.id_factura, f.fecha_emision);
 
         let detalleHtml = "";
         let totalCalculado = 0;
@@ -578,9 +690,20 @@ function mostrarFacturasBuscadas() {
         });
 
         let colorBadge = "primary";
-        if (f.estado === "Anulada") colorBadge = "danger";
-        else if (f.estado === "Pagado" || f.estado === "Finalizado") colorBadge = "success";
-        else if (f.estado === "Emitido") colorBadge = "info";
+        let iconoEstado = "bi-clock-history";
+        let textoEstadoMostrar = f.estado;
+
+        if (esAnulada) {
+            colorBadge = "danger";
+            iconoEstado = "bi-x-circle";
+        } else if (esPagada) {
+            colorBadge = "success";
+            iconoEstado = "bi-check-circle-fill";
+            textoEstadoMostrar = "PAGADA"; 
+        } else if (f.estado === "Emitido" || f.estado === "Emitida") {
+            colorBadge = "info";
+            iconoEstado = "bi-send";
+        }
 
         card.innerHTML = `
             <div class="factura-header">
@@ -591,17 +714,28 @@ function mostrarFacturasBuscadas() {
                         </div>
                         <div>
                             <h6 class="fw-bold mb-0">Factura ${facturaFormateada}</h6>
-                            <small class="text-muted">${fechaEmi.toLocaleString('es-CO', {dateStyle: 'medium', timeStyle: 'short'})}</small>
+                            <small class="text-primary fw-bold" style="font-size: 0.75rem;">CC: ${f.usuarios?.cedula || 'No registrada'}</small>
                         </div>
                     </div>
-                    <span class="badge badge-status bg-${colorBadge}">${f.estado}</span>
+                    <span class="badge badge-status bg-${colorBadge} d-flex align-items-center gap-1">
+                        <i class="bi ${iconoEstado}"></i> ${textoEstadoMostrar.toUpperCase()}
+                    </span>
                 </div>
             </div>
             <div class="factura-body">
-                <div class="mb-2 small text-uppercase text-muted fw-bold" style="letter-spacing: 1px;">Detalles del pedido</div>
+                <div class="mb-2 small text-uppercase text-muted fw-bold" style="letter-spacing: 1px;">Resumen del pedido</div>
                 <div class="lista-productos">
                     ${detalleHtml}
                 </div>
+                ${(!esEstadoFinal) ? `
+                    <button class="btn btn-primary w-100 mt-3 fw-bold rounded-pill btn-pagar-modal-factura shadow-sm">
+                        <i class="bi bi-qr-code me-2"></i>Pagar Ahora (Medios de Pago)
+                    </button>
+                ` : `
+                    <div class="mt-3 p-2 border rounded-3 bg-light text-center text-success small fw-bold">
+                        <i class="bi bi-shield-check me-1"></i> ESTADO: ${textoEstadoMostrar.toUpperCase()}
+                    </div>
+                `}
             </div>
             <div class="factura-footer">
                 <div class="d-flex justify-content-between align-items-center">
@@ -609,20 +743,29 @@ function mostrarFacturasBuscadas() {
                         <button class="btn btn-sm btn-dark px-3 btn-pdf-action">
                             <i class="bi bi-file-earmark-pdf"></i> PDF
                         </button>
-                        ${f.estado !== 'Anulada' && f.estado !== 'Pagado' && f.estado !== 'Finalizado' ? 
+                        ${(!esEstadoFinal) ? 
                             `<button class="btn btn-sm btn-outline-danger px-3 fw-bold btn-anular-action">Anular</button>` : 
-                            `<button class="btn btn-sm btn-link text-muted text-decoration-none btn-eliminar-action"><i class="bi bi-trash"></i> Quitar de la lista</button>`
+                            `<button class="btn btn-sm btn-link text-muted text-decoration-none btn-eliminar-action"><i class="bi bi-trash"></i> Quitar</button>`
                         }
                     </div>
                     <div class="text-end">
-                        <div class="small text-muted mb-0" style="font-size: 0.7rem;">TOTAL FACTURADO</div>
+                        <div class="small text-muted mb-0" style="font-size: 0.7rem;">TOTAL NETO</div>
                         <div class="fw-bold fs-5 text-primary">${totalCalculado.toLocaleString('es-CO', {style: 'currency', currency: 'COP', maximumFractionDigits: 0})}</div>
                     </div>
                 </div>
             </div>`;
         
+        const btnPagar = card.querySelector('.btn-pagar-modal-factura');
+        if (btnPagar) {
+            btnPagar.addEventListener('click', (e) => {
+                e.preventDefault();
+                abrirModalPago(facturaFormateada, totalCalculado.toLocaleString('es-CO', {style: 'currency', currency: 'COP', maximumFractionDigits: 0}));
+            });
+        }
+
         card.querySelector('.btn-pdf-action').onclick = () => {
             f.numero_factura_visual = facturaFormateada;
+            f.numero_factura = facturaFormateada;
             descargarPDF(f);
         };
         
@@ -630,8 +773,8 @@ function mostrarFacturasBuscadas() {
         if (btnAnular) btnAnular.onclick = () => anularFactura(f.id_factura);
         
         const btnEliminar = card.querySelector('.btn-eliminar-action');
-        if (btnEliminar) btnEliminar.onclick = () => {
-            showConfirmToast("¿Quitar esta factura de la lista visual?", () => {
+        if (btnEliminar) {
+            btnEliminar.onclick = () => {
                 const ocultas = JSON.parse(localStorage.getItem('facturas_ocultas') || "[]");
                 if (!ocultas.includes(f.id_factura)) {
                     ocultas.push(f.id_factura);
@@ -639,9 +782,9 @@ function mostrarFacturasBuscadas() {
                 }
                 facturasActuales = facturasActuales.filter(fact => fact.id_factura !== f.id_factura);
                 mostrarFacturasBuscadas();
-                showMessage("Vista actualizada");
-            });
-        };
+                showMessage("Factura ocultada de la vista");
+            };
+        }
         
         container.appendChild(card);
     });
@@ -688,6 +831,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     cargarCarrito();
+    cargarMetodosPago();
 
     if (Notification.permission !== "granted") {
         Notification.requestPermission();

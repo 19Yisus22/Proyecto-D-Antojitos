@@ -3,7 +3,7 @@ body {
     color: #b35d6d;
     font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     margin: 0;
-    padding: 10px;
+    padding: 20px;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -19,7 +19,6 @@ body {
     box-shadow: 0 15px 35px rgba(214, 51, 108, 0.1);
     background-color: #ffffff;
     animation: slideIn 0.8s ease forwards;
-    margin: auto;
 }
 
 @keyframes slideIn {
@@ -44,11 +43,12 @@ body {
     filter: drop-shadow(0 4px 6px rgba(0,0,0,0.05));
 }
 
-h2, h3, h4 {
+h2 {
     color: #d6336c;
     font-weight: 700;
     text-align: center;
     margin-bottom: 1.5rem;
+    font-size: 1.5rem;
 }
 
 .form-label {
@@ -56,137 +56,56 @@ h2, h3, h4 {
     font-weight: 600;
     font-size: 0.85rem;
     margin-bottom: 0.4rem;
-    display: block;
 }
 
-input.form-control {
+.form-control {
     background-color: #fff9fa;
     border: 2px solid #fce4ec;
     border-radius: 12px;
-    padding: 12px 15px;
+    padding: 10px 15px;
     color: #555;
-    width: 100%;
-    box-sizing: border-box;
     transition: all 0.3s ease;
+    font-size: 0.9rem;
 }
 
-input.form-control:focus {
+.form-control:focus {
     background-color: #ffffff;
     border-color: #ff80ab;
     box-shadow: 0 0 0 0.25rem rgba(255, 128, 171, 0.15);
     outline: none;
 }
 
-button.btn-gradient {
+.btn-gradient {
     background: linear-gradient(45deg, #ff80ab, #ff4081);
     border: none;
     border-radius: 12px;
     color: #fff;
-    padding: 14px;
+    padding: 12px;
     font-weight: bold;
-    font-size: 1rem;
+    font-size: 0.95rem;
     width: 100%;
     transition: all 0.3s ease;
-    cursor: pointer;
-    margin-top: 1rem;
-    display: block;
+    margin-top: 0.5rem;
 }
 
-button.btn-gradient:hover {
+.btn-gradient:hover {
     transform: translateY(-2px);
     box-shadow: 0 8px 20px rgba(255, 64, 129, 0.3);
-    filter: brightness(1.05);
-}
-
-.separator {
-    display: flex;
-    align-items: center;
-    text-align: center;
-    margin: 1.8rem 0;
-    color: #b35d6d;
-    font-size: 0.8rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-.separator::before,
-.separator::after {
-    content: '';
-    flex: 1;
-    border-bottom: 1px solid #fce4ec;
-}
-
-.separator:not(:empty)::before {
-    margin-right: .7em;
-}
-
-.separator:not(:empty)::after {
-    margin-left: .7em;
-}
-
-#buttonDiv {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 100%;
-    min-height: 44px;
-    margin-top: 0.5rem;
-    overflow: hidden;
-    border-radius: 12px;
-    transition: transform 0.2s ease;
-}
-
-#buttonDiv:active {
-    transform: scale(0.98);
-}
-
-.custom-toast {
-    background: #ffffff;
-    color: #444;
-    border-radius: 15px;
-    padding: 15px 25px;
-    min-width: 280px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    box-shadow: 0 15px 40px rgba(0,0,0,0.1);
-    border-left: 6px solid #ff4081;
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 9999;
+    color: #fff;
 }
 
 @media (max-width: 576px) {
     body {
         padding: 15px;
         align-items: flex-start;
-        background: #fff5f5;
     }
 
     .card-registro {
-        padding: 1.5rem;
+        padding: 1.8rem;
         border-radius: 20px;
-        margin-top: 10px;
-        margin-bottom: 10px;
-        box-shadow: 0 10px 25px rgba(214, 51, 108, 0.08);
-    }
-
-    .logo-container img {
-        max-width: 70px;
     }
 
     h2 {
-        font-size: 1.4rem;
-    }
-
-    input.form-control {
-        padding: 10px;
-        font-size: 16px;
-    }
-
-    #buttonDiv {
-        transform: scale(0.95);
+        font-size: 1.3rem;
     }
 }

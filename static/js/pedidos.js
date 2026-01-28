@@ -14,9 +14,51 @@ let ultimoIdPedidoNotificado = parseInt(localStorage.getItem("ultimoIdPedidoNoti
 const sonidoNuevoPedido = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
 sonidoNuevoPedido.volume = 0.7;
 
+async function verificarAccesoAdmin() {
+    try {
+        const res = await fetch("/gestionar_productos");
+        
+        if (res.status === 401 || res.status === 403) {
+            document.documentElement.innerHTML = `
+                <head>
+                    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+                    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+                    <style>
+                        body { background: #000; color: white; height: 100vh; display: flex; align-items: center; justify-content: center; font-family: sans-serif; overflow: hidden; }
+                        .lock-box { text-align: center; border: 1px solid #333; padding: 3rem; border-radius: 20px; background: #0a0a0a; }
+                        .shield-icon { font-size: 5rem; color: #ff4757; animation: pulse 2s infinite; }
+                        @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.7; } 100% { transform: scale(1); opacity: 1; } }
+                    </style>
+                </head>
+                <body>
+                    <div class="lock-box shadow-lg">
+                        <i class="bi bi-shield-slash-fill shield-icon"></i>
+                        <h1 class="fw-bold mt-3">MÓDULO PROTEGIDO</h1>
+                        <p class="text-secondary">Se requiere nivel de acceso administrativo para esta sección.</p>
+                        <div class="spinner-border text-danger my-3" role="status"></div>
+                        <br>
+                        <button onclick="window.location.href='/'" class="btn btn-outline-danger mt-2 px-5">SALIR</button>
+                    </div>
+                </body>
+            `;
+            setTimeout(() => { window.location.href = "/"; }, 4000);
+            return false;
+        }
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
 function showMessage(msg, isError = false) {
-    const container = document.getElementById('toastContainer');
-    if (!container) return;
+    let container = document.getElementById('toastContainer');
+    if (!container) {
+        container = document.createElement("div");
+        container.id = "toastContainer";
+        container.style.cssText = "position: fixed; top: 20px; right: 20px; z-index: 9999;";
+        document.body.appendChild(container);
+    }
+
     const toast = document.createElement('div');
     toast.className = 'custom-toast';
     toast.innerHTML = `
@@ -26,91 +68,29 @@ function showMessage(msg, isError = false) {
         </div>
         <i class="bi bi-x-lg ms-2 btn-close-toast" style="cursor:pointer; font-size: 0.65rem;"></i>
     `;
+    
     container.appendChild(toast);
+
     const remove = () => {
         toast.style.opacity = '0';
         setTimeout(() => toast.remove(), 400);
     };
+
     toast.querySelector('.btn-close-toast').onclick = remove;
     setTimeout(remove, 3500);
 }
 
-function showConfirmToast(msg, callback) {
-    const container = document.getElementById('toastContainer');
-    const toast = document.createElement('div');
-    toast.className = 'custom-toast border-warning shadow-lg';
-    toast.style.minWidth = "280px";
-    toast.innerHTML = `
-        <div class="flex-column w-100">
-            <div class="d-flex align-items-center mb-2">
-                <i class="bi bi-exclamation-triangle text-warning me-2 fs-6"></i>
-                <span class="fw-bold" style="font-size: 0.85rem;">${msg}</span>
-            </div>
-            <div class="d-flex justify-content-end gap-2">
-                <button class="btn btn-sm btn-outline-secondary btn-cancel" style="font-size: 0.75rem;">Cancelar</button>
-                <button class="btn btn-sm btn-danger btn-confirm" style="font-size: 0.75rem;">Confirmar</button>
-            </div>
-        </div>
-    `;
-    container.appendChild(toast);
-    const remove = () => {
-        toast.style.opacity = '0';
-        setTimeout(() => toast.remove(), 400);
-    };
-    toast.querySelector('.btn-cancel').onclick = remove;
-    toast.querySelector('.btn-confirm').onclick = () => {
-        callback();
-        remove();
-    };
-}
-
-async function verificarAccesoAdmin() {
-    try {
-        const res = await fetch("/obtener_pedidos");
-        
-        if (res.status === 401 || res.status === 403) {
-            document.documentElement.innerHTML = `
-                <!DOCTYPE html>
-                <html lang="es">
-                <head>
-                    <meta charset="UTF-8">
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <title>Acceso Restringido</title>
-                    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-                    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-                    <style>
-                        body { background-color: #0d0d0d; margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
-                        .lock-container { height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: white; }
-                        .icon-lock { font-size: 7rem; color: #dc3545; margin-bottom: 1rem; animation: pulse 2s infinite; }
-                        .btn-exit { border-radius: 50px; padding: 10px 35px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
-                        @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.05); opacity: 0.7; } 100% { transform: scale(1); opacity: 1; } }
-                    </style>
-                </head>
-                <body>
-                    <div class="lock-container">
-                        <i class="bi bi-shield-lock-fill icon-lock"></i>
-                        <h1 class="display-4 fw-bold">ACCESO DENEGADO</h1>
-                        <p class="text-muted fs-5 mb-4" style="max-width: 500px;">
-                            Lo sentimos, no cuentas con los permisos administrativos necesarios para visualizar este panel.
-                        </p>
-                        <div class="spinner-border text-danger mb-4" style="width: 3rem; height: 3rem;"></div>
-                        <p class="small text-uppercase text-secondary">Redirigiendo a zona segura...</p>
-                        <button onclick="window.location.href='/login'" class="btn btn-outline-danger btn-exit mt-2">Salir Ahora</button>
-                    </div>
-                </body>
-                </html>
-            `;
-            
-            setTimeout(() => {
-                window.location.href = "/login"; 
-            }, 4500);
-            
-            return false;
+function escucharEventosTiempoReal() {
+    window.addEventListener('storage', (e) => {
+        if (e.key === 'nuevoPedidoDetectado') {
+            cargarPedidos();
         }
-        return true;
-    } catch (e) {
-        return false;
-    }
+        if (e.key === 'pedidoAnuladoRecientemente') {
+            const data = JSON.parse(e.newValue);
+            notificarAnulacionCritica(data);
+            cargarPedidos();
+        }
+    });
 }
 
 async function iniciarModuloPedidos() {
@@ -174,28 +154,6 @@ function generarNumeroFactura(idPedido, fecha) {
 function normalizarTexto(texto) {
     if (!texto) return "";
     return texto.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, '');
-}
-
-function notificarNuevoPedido() {
-    sonidoNuevoPedido.play().catch(() => {});
-    const container = document.getElementById('toastContainer');
-    if (!container) return;
-    const toast = document.createElement('div');
-    toast.className = 'custom-toast bg-primary text-white border-0 shadow-lg';
-    toast.innerHTML = `
-        <div class="d-flex align-items-center p-2">
-            <div class="spinner-grow spinner-grow-sm text-white me-3"></div>
-            <div class="d-flex flex-column">
-                <span style="font-size: 0.95rem;"><strong>¡NUEVO PEDIDO!</strong></span>
-                <span style="font-size: 0.8rem;">Se ha detectado una nueva compra.</span>
-            </div>
-        </div>
-    `;
-    container.appendChild(toast);
-    setTimeout(() => {
-        toast.style.opacity = '0';
-        setTimeout(() => toast.remove(), 400);
-    }, 8000);
 }
 
 function renderizarPaginacion(lista) {
@@ -263,10 +221,6 @@ async function cargarPedidos(isAutoRefresh = false) {
         pedidosDatosRaw = pedidos;
         const idsPedidosActuales = pedidos.map(p => parseInt(p.id_pedido));
         const maxIdActual = idsPedidosActuales.length > 0 ? Math.max(...idsPedidosActuales) : 0;
-
-        if (ultimoIdPedidoNotificado !== 0 && maxIdActual > ultimoIdPedidoNotificado) {
-            notificarNuevoPedido();
-        }
         
         if (maxIdActual > 0) {
             ultimoIdPedidoNotificado = maxIdActual;
@@ -302,22 +256,11 @@ async function cargarPedidos(isAutoRefresh = false) {
             let estadoClase = esAnulado ? "pedido-anulado" : (esTerminado ? "pedido-finalizado" : "pedido-activo");
 
             card.className = `pedido-card card-collapsed col-12 mb-3 p-2 shadow-sm ${estadoClase} ${esFijado ? 'fijado border-primary' : ''}`;
-            card.dataset.factura = normalizarTexto(facturaFormateada);
-            card.dataset.estado = pedido.estado;
-            card.dataset.todosPagos = todosPagos;
             card.dataset.id_real = idPedidoStr;
-            card.dataset.fijado = esFijado;
             card.id = `pedido-${pedido.id_pedido}`;
 
             const fechaStr = pedido.fecha_pedido ? new Date(pedido.fecha_pedido).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' }) : '---';
             let textoPago = todosPagos ? 'Pagado' : `Pendiente (${estadosPagoArray.filter(p => !p).length})`;
-
-            const nombreCliente = `${user.nombre || ''} ${user.apellido || ''}`.trim() || 'Sin nombre';
-            const cedulaCliente = user.cedula || 'Sin cédula';
-            const telefonoCliente = user.telefono || 'Sin teléfono';
-            const correoCliente = user.correo || 'Sin correo';
-            const direccionCliente = user.direccion || 'Sin dirección';
-            const metodoPagoCliente = user.metodo_pago || 'Efectivo';
 
             card.innerHTML = `
                 <div class="card border-0 bg-transparent">
@@ -327,55 +270,17 @@ async function cargarPedidos(isAutoRefresh = false) {
                             <img src="${user.imagen_url || '/static/uploads/default.png'}" class="rounded-circle" style="width:40px;height:40px;object-fit:cover;">
                             <div><strong>${facturaFormateada}</strong><br><small class="status-info">Estado: ${pedido.estado} - ${textoPago} | ${fechaStr}</small></div>
                         </div>
-                        <div class="d-flex gap-2"><i class="bi bi-chevron-down icono fs-4 toggle-detalle"></i><i class="bi bi-trash icono text-danger fs-4 btn-select-delete"></i></div>
+                        <div class="d-flex gap-2">
+                            <i class="bi bi-chevron-down icono fs-4 toggle-detalle"></i>
+                            <i class="bi bi-trash icono text-danger fs-4 btn-eliminar-individual" style="cursor:pointer"></i>
+                            <i class="bi bi-check-square icono text-primary fs-4 btn-select-delete" style="cursor:pointer"></i>
+                        </div>
                     </div>
                     <div class="card-body">
                         <div class="row mb-3">
                             <div class="col-md-6 mb-3 mb-md-0">
-                                <div class="d-flex align-items-start mb-2">
-                                    <i class="bi bi-person-fill text-primary me-2 fs-5"></i>
-                                    <div class="flex-grow-1">
-                                        <small class="text-muted d-block">Cliente</small>
-                                        <strong>${nombreCliente}</strong>
-                                    </div>
-                                </div>
-                                <div class="d-flex align-items-start mb-2">
-                                    <i class="bi bi-card-text text-primary me-2 fs-5"></i>
-                                    <div class="flex-grow-1">
-                                        <small class="text-muted d-block">Cédula</small>
-                                        <strong>${cedulaCliente}</strong>
-                                    </div>
-                                </div>
-                                <div class="d-flex align-items-start mb-2">
-                                    <i class="bi bi-telephone-fill text-primary me-2 fs-5"></i>
-                                    <div class="flex-grow-1">
-                                        <small class="text-muted d-block">Teléfono</small>
-                                        <strong>${telefonoCliente}</strong>
-                                    </div>
-                                </div>
-                                <div class="d-flex align-items-start">
-                                    <i class="bi bi-credit-card-fill text-primary me-2 fs-5"></i>
-                                    <div class="flex-grow-1">
-                                        <small class="text-muted d-block">Método de Pago</small>
-                                        <strong>${metodoPagoCliente}</strong>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="d-flex align-items-start mb-2">
-                                    <i class="bi bi-envelope-fill text-primary me-2 fs-5"></i>
-                                    <div class="flex-grow-1">
-                                        <small class="text-muted d-block">Correo Electrónico</small>
-                                        <strong class="text-break small">${correoCliente}</strong>
-                                    </div>
-                                </div>
-                                <div class="d-flex align-items-start">
-                                    <i class="bi bi-geo-alt-fill text-primary me-2 fs-5"></i>
-                                    <div class="flex-grow-1">
-                                        <small class="text-muted d-block">Dirección de Entrega</small>
-                                        <strong class="text-break small">${direccionCliente}</strong>
-                                    </div>
-                                </div>
+                                <strong>Cliente: ${user.nombre || 'Sin nombre'}</strong><br>
+                                <small>Cédula: ${user.cedula || 'N/A'}</small>
                             </div>
                         </div>
                         <table class="table table-sm text-center">
@@ -384,7 +289,8 @@ async function cargarPedidos(isAutoRefresh = false) {
                         </table>
                         <div class="d-flex gap-2 align-items-center mt-3">
                             <select class="form-select form-select-sm estado-select" ${bloqueado ? 'disabled' : ''}>
-                                <option value="Pendiente" ${pedido.estado === 'Pendiente' ? 'selected' : ''}>Activo</option>
+                                <option value="Pendiente" ${pedido.estado === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
+                                <option value="Enviado" ${pedido.estado === 'Enviado' ? 'selected' : ''}>Enviado</option>
                                 <option value="Entregado" ${pedido.estado === 'Entregado' ? 'selected' : ''}>Finalizado</option>
                                 <option value="Cancelado" ${pedido.estado === 'Cancelado' ? 'selected' : ''}>Anulado</option>
                             </select>
@@ -393,20 +299,30 @@ async function cargarPedidos(isAutoRefresh = false) {
                     </div>
                 </div>`;
 
-            const btnFijar = card.querySelector(".btn-fijar");
-            btnFijar.onclick = () => {
+            card.querySelector(".btn-eliminar-individual").onclick = async () => {
+                try {
+                    const res = await fetch("/eliminar_pedidos", {
+                        method: "DELETE",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ ids: [idPedidoStr] })
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.success) {
+                        showMessage("Pedido eliminado");
+                        await cargarPedidos();
+                    } else {
+                        showMessage(data.message || "Error", true);
+                    }
+                } catch (e) {
+                    showMessage("Error de conexión", true);
+                }
+            };
+
+            card.querySelector(".btn-fijar").onclick = () => {
                 if (pedidosFijados.includes(idPedidoStr)) {
                     pedidosFijados = pedidosFijados.filter(id => id !== idPedidoStr);
-                    btnFijar.classList.replace('bi-pin-angle-fill', 'bi-pin-angle');
-                    btnFijar.classList.remove('text-primary');
-                    card.classList.remove('fijado');
-                    card.dataset.fijado = "false";
                 } else {
                     pedidosFijados.push(idPedidoStr);
-                    btnFijar.classList.replace('bi-pin-angle', 'bi-pin-angle-fill');
-                    btnFijar.classList.add('text-primary');
-                    card.classList.add('fijado');
-                    card.dataset.fijado = "true";
                 }
                 localStorage.setItem("pedidosFijados", JSON.stringify(pedidosFijados));
                 aplicarFiltros();
@@ -423,26 +339,35 @@ async function cargarPedidos(isAutoRefresh = false) {
                     body: JSON.stringify({ estado: nuevo })
                 });
                 if (r.ok) {
-                    showMessage(`Estado cambiado a ${nuevo}`);
+                    const resData = await r.json();
+                    showMessage(`Estado: ${nuevo}`);
                     await cargarPedidos();
                 }
             };
 
             card.querySelectorAll(".toggle-pago-item").forEach(icon => {
                 if (bloqueado) return;
-                icon.onclick = () => {
+                icon.onclick = async () => {
                     const itemId = icon.dataset.itemId;
                     const val = icon.dataset.pagado === 'false';
-                    icon.dataset.pagado = val;
-                    icon.className = `bi ${val ? 'bi-check-circle text-success' : 'bi-x-circle text-danger'} fs-4 toggle-pago-item`;
                     estadosPagoGuardados[itemId] = val;
                     localStorage.setItem("estadosPagoItems", JSON.stringify(estadosPagoGuardados));
-                    const currentCards = Array.from(card.querySelectorAll(".toggle-pago-item"));
-                    const todos = currentCards.every(i => i.dataset.pagado === 'true');
-                    card.dataset.todosPagos = todos;
-                    const pends = currentCards.filter(i => i.dataset.pagado === 'false').length;
-                    card.querySelector(".status-info").innerHTML = `Estado: ${pedido.estado} - ${todos ? 'Pagado' : 'Pendiente ('+pends+')'} | ${fechaStr}`;
-                    showMessage(val ? "Pago registrado" : "Pago pendiente");
+
+                    const currentIcons = Array.from(card.querySelectorAll(".toggle-pago-item"));
+                    const todosPagadosGlobal = currentIcons.every(i => (i.dataset.itemId === itemId ? val : i.dataset.pagado === 'true'));
+
+                    const res = await fetch(`/actualizar_pago/${pedido.id_pedido}`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ pagado: todosPagadosGlobal })
+                    });
+
+                    if (res.ok) {
+                        icon.dataset.pagado = val;
+                        icon.className = `bi ${val ? 'bi-check-circle text-success' : 'bi-x-circle text-danger'} fs-4 toggle-pago-item`;
+                        await cargarPedidos();
+                        showMessage("Pago actualizado");
+                    }
                 };
             });
 
@@ -494,6 +419,21 @@ function aplicarFiltros() {
 
     renderizarPaginacion(pedidosFiltrados);
 }
+
+function inicializarSelectAnios() {
+    const s = document.getElementById("selectAnio");
+    const rs = document.getElementById("repoAnio");
+    if (!s || !rs) return;
+    const a = new Date().getFullYear();
+    for (let i = a; i >= a - 5; i--) {
+        const o = document.createElement("option"); o.value = i; o.textContent = i;
+        const o2 = o.cloneNode(true);
+        s.appendChild(o);
+        rs.appendChild(o2);
+    }
+}
+
+document.getElementById("btnGenerarPDF")?.addEventListener("click", generarReporteConfigurado);
 
 async function generarReporteConfigurado() {
     const { jsPDF } = window.jspdf;
@@ -659,67 +599,33 @@ function dibujarGraficoEstadistico(doc, stats, y) {
     });
 }
 
-function escucharEventosTiempoReal() {
-    window.addEventListener('storage', (e) => {
-        if (e.key === 'nuevoPedidoDetectado') {
-            notificarNuevoPedido();
-            cargarPedidos();
-        }
-        if (e.key === 'pedidoAnuladoRecientemente') {
-            const data = JSON.parse(e.newValue);
-            notificarAnulacionCritica(data);
-            cargarPedidos();
-        }
-    });
-}
+document.addEventListener('change', async (e) => {
+    if (e.target.classList.contains('check-pago')) {
+        const idPedido = e.target.dataset.id;
+        const estaPagado = e.target.checked;
 
-function notificarAnulacionCritica(data) {
-    sonidoNuevoPedido.play().catch(() => {});
-    const container = document.getElementById('toastContainer');
-    const toast = document.createElement('div');
-    toast.className = 'custom-toast bg-danger text-white border-0 shadow-lg';
-    toast.innerHTML = `
-        <div class="d-flex align-items-center p-2">
-            <i class="bi bi-exclamation-octagon-fill fs-4 me-3"></i>
-            <div class="d-flex flex-column">
-                <span style="font-size: 0.95rem;"><strong>¡ANULACIÓN RECIBIDA!</strong></span>
-                <span style="font-size: 0.8rem;">El cliente ${data.cliente} anuló el pedido #${data.id_pedido}.</span>
-            </div>
-        </div>
-    `;
-    container.appendChild(toast);
-    setTimeout(() => {
-        toast.style.opacity = '0';
-        setTimeout(() => toast.remove(), 400);
-    }, 10000);
-}
+        try {
+            const response = await fetch(`/actualizar_pago/${idPedido}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pagado: estaPagado })
+            });
 
-function inicializarSelectAnios() {
-    const s = document.getElementById("selectAnio");
-    const rs = document.getElementById("repoAnio");
-    if (!s || !rs) return;
-    const a = new Date().getFullYear();
-    for (let i = a; i >= a - 5; i--) {
-        const o = document.createElement("option"); o.value = i; o.textContent = i;
-        const o2 = o.cloneNode(true);
-        s.appendChild(o);
-        rs.appendChild(o2);
+            const result = await response.json();
+
+            if (!response.ok) {
+                e.target.checked = !estaPagado;
+                mostrarNotificacionInterna(result.error, "error");
+            } else {
+                mostrarNotificacionInterna("Pago actualizado", "success");
+            }
+        } catch (error) {
+            e.target.checked = !estaPagado;
+            console.error("Error al actualizar pago:", error);
+        }
     }
-}
+});
 
-document.getElementById("btnGenerarPDF")?.addEventListener("click", generarReporteConfigurado);
-
-document.getElementById("eliminarSeleccionados").onclick = () => {
-    const sel = document.querySelectorAll(".pedido-card.seleccion");
-    if (sel.length === 0) return showMessage("Seleccione pedidos", true);
-    showConfirmToast(`¿Eliminar ${sel.length} pedidos?`, async () => {
-        for (const c of sel) {
-            await fetch(`/eliminar_pedido/${c.id.replace("pedido-", "")}`, { method: "DELETE" });
-        }
-        showMessage("Eliminados correctamente");
-        await cargarPedidos();
-    });
-};
 
 const inputsFiltro = ["inputBusquedaNombre", "inputBusquedaCedula", "inputNumeroFactura", "selectAnio", "filtroEstado"];
 inputsFiltro.forEach(id => {
@@ -729,121 +635,45 @@ inputsFiltro.forEach(id => {
     });
 });
 
+document.addEventListener("DOMContentLoaded", async () => {
+    const tieneAcceso = await verificarAccesoAdmin();
+    
+    if (!tieneAcceso) return;
+
+    const carrusel = document.getElementById("carruselContainer");
+    if (carrusel) {
+        cargarPublicidadActiva();
+        cargarAlertasActivas();
+        initDrag("carruselContainer");
+        initDrag("seccionesContainer");
+        initDrag("cintaContainer");
+        
+        document.getElementById("btnGuardarMarketing")?.addEventListener("click", guardarMarketing);
+        document.getElementById("btnPublicarNotificacion")?.addEventListener("click", crearNotificacion);
+
+        const inputNotificacion = document.getElementById("archivoNotificacion");
+        if (inputNotificacion) {
+            inputNotificacion.onchange = function() {
+                const file = this.files[0];
+                if (validarArchivo(file)) {
+                    const reader = new FileReader();
+                    reader.onload = e => {
+                        const preview = document.getElementById("previewNotificacion");
+                        const img = document.getElementById("previewNotificacionImg");
+                        if (img) img.src = e.target.result;
+                        if (preview) preview.style.display = "block";
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+        }
+    }
+});
+
 inicializarSelectAnios();
 cargarPedidos();
 escucharEventosTiempoReal();
 setInterval(() => cargarPedidos(true), 15000);
-
-async function verificarAccesoAdmin() {
-    try {
-        const res = await fetch("/gestionar_productos");
-        
-        if (res.status === 401 || res.status === 403) {
-            document.documentElement.innerHTML = `
-                <head>
-                    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-                    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-                    <style>
-                        body { background: #000; color: white; height: 100vh; display: flex; align-items: center; justify-content: center; font-family: sans-serif; overflow: hidden; }
-                        .lock-box { text-align: center; border: 1px solid #333; padding: 3rem; border-radius: 20px; background: #0a0a0a; }
-                        .shield-icon { font-size: 5rem; color: #ff4757; animation: pulse 2s infinite; }
-                        @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.7; } 100% { transform: scale(1); opacity: 1; } }
-                    </style>
-                </head>
-                <body>
-                    <div class="lock-box shadow-lg">
-                        <i class="bi bi-shield-slash-fill shield-icon"></i>
-                        <h1 class="fw-bold mt-3">MÓDULO PROTEGIDO</h1>
-                        <p class="text-secondary">Se requiere nivel de acceso administrativo para esta sección.</p>
-                        <div class="spinner-border text-danger my-3" role="status"></div>
-                        <br>
-                        <button onclick="window.location.href='/'" class="btn btn-outline-danger mt-2 px-5">SALIR</button>
-                    </div>
-                </body>
-            `;
-            setTimeout(() => { window.location.href = "/"; }, 4000);
-            return false;
-        }
-        return true;
-    } catch (e) {
-        return false;
-    }
-}
-
-document.addEventListener("DOMContentLoaded", async () => {
-    const tieneAcceso = await verificarAccesoAdmin();
-    if (!tieneAcceso) return;
-
-    ajustarAtributosPrecio();
-    
-    const cached = localStorage.getItem('postresCache');
-    if (cached) {
-        postres = JSON.parse(cached);
-        renderPostres();
-    }
-    
-    await cargarPostres();
-    
-    setInterval(() => {
-        cargarPostres(true);
-    }, 10000);
-
-    if (btnAgregarPostre) {
-        btnAgregarPostre.addEventListener("click", () => {
-            indexActual = null;
-            agregarPostreForm.reset();
-            btnSubmitForm.innerHTML = '<i class="bi bi-check-lg me-2"></i>Subir Postre';
-            formAgregarPostre.classList.remove("d-none");
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        });
-    }
-
-    if (btnCancelar) {
-        btnCancelar.addEventListener("click", () => {
-            formAgregarPostre.classList.add("d-none");
-            agregarPostreForm.reset();
-            indexActual = null;
-        });
-    }
-
-    const btnEliminar = document.getElementById("btnEliminar");
-    if (btnEliminar) {
-        btnEliminar.onclick = async () => {
-            if (indexActual === null) return;
-            const p = postres[indexActual];
-            try {
-                const res = await fetch(`/eliminar_producto/${p.id_producto}`, { method: "DELETE" });
-                if (res.ok) {
-                    showMessage("Producto eliminado");
-                    modal.hide();
-                    indexActual = null;
-                    await cargarPostres();
-                } else {
-                    const err = await res.json();
-                    showMessage(err.error || "Error al eliminar", true);
-                }
-            } catch (e) {
-                showMessage("Error de conexión", true);
-            }
-        };
-    }
-
-    const btnEditar = document.getElementById("btnEditar");
-    if (btnEditar) {
-        btnEditar.onclick = () => {
-            if (indexActual === null) return;
-            const p = postres[indexActual];
-            document.getElementById("nombrePostre").value = p.nombre;
-            document.getElementById("precioPostre").value = p.precio;
-            document.getElementById("descripcionPostre").value = p.descripcion;
-            document.getElementById("stockPostre").value = p.stock;
-            btnSubmitForm.innerHTML = '<i class="bi bi-pencil-square me-2"></i>Actualizar Postre';
-            formAgregarPostre.classList.remove("d-none");
-            modal.hide();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        };
-    }
-});
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
