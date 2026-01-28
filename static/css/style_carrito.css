@@ -233,19 +233,16 @@ body {
 }
 
 footer, .footer {
-    flex-shrink: 0;
     background-color: #000;
     color: #fff;
     padding: 40px 0 20px 0;
-    margin-top: auto;
-    border-top: 4px solid var(--primary);
+    border-top: 4px solid var(--primary-color);
+    flex-shrink: 0;
+    width: 100%;
 }
 
-.footer-bottom {
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    padding-top: 15px;
-    font-size: 0.85rem;
-    color: rgba(255, 255, 255, 0.6);
+footer .container-central, .footer .container-central {
+    padding: 0 1rem;
 }
 
 @media (max-width: 768px) {

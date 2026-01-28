@@ -6,8 +6,8 @@ from supabase import create_client
 from datetime import datetime, timezone, timedelta
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
-from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 import os, uuid, socket, secrets, logging, hashlib, cloudinary, cloudinary.uploader, json
+from flask import Flask, request, jsonify, render_template, session, redirect, url_for, make_response
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
@@ -151,8 +151,11 @@ def registro_google():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "GET":
+        if "user_id" in session:
+            return redirect("/inicio")
         return render_template("login.html")
     
+    session.clear()
     data = request.get_json()
     correo = data.get("correo", "").strip().lower()
     
@@ -226,8 +229,13 @@ def logout():
             supabase.table("usuarios").update({"ultima_conexion": "2000-01-01T00:00:00Z"}).eq("id_cliente", user_id).execute()
         except:
             pass
+    
     session.clear()
-    return redirect("/login")
+    response = make_response(redirect("/login"))
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 
 # APARTADO DE PERFILES
@@ -1370,7 +1378,7 @@ def admin_gestion_notificacion(id_publicidad):
 
 # APARTADO DE ZONA DE PAGOS
 
-@app.route("/zona_pagos_page", methods=["GET", "POST"])
+@app.route("/facturacion_page", methods=["GET", "POST"])
 def zona_pagos():
     if not session.get("user_id") or session.get("rol") != "admin":
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.method == "POST":
