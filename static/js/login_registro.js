@@ -105,7 +105,11 @@ window.addEventListener('DOMContentLoaded', () => {
 
     const errorMsg = urlParams.get('error');
     if (errorMsg) {
-        if (errorMsg.includes("Token used too early") || errorMsg.includes("1769537647")) {
+        const esErrorReloj = errorMsg.includes("Token used too early") || 
+                             errorMsg.includes("iat") || 
+                             errorMsg.includes("1769537647");
+
+        if (esErrorReloj) {
             showMessage("Sincronización", "El reloj de tu equipo está desfasado. Por favor, ajústalo a la hora automática.", false);
         } else {
             showMessage("Error de Acceso", errorMsg, false);

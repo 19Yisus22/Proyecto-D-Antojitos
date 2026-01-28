@@ -198,10 +198,9 @@ function actualizarTituloTabla() {
     if (!titulo) return;
     const filtro = document.getElementById("filtroEstado").value;
     const titulos = {
-        "Todos": "Todos los Pedidos",
-        "Pendiente": "Pedidos Activos",
-        "FiltroPagoPendiente": "Pedidos con Pago Pendiente",
-        "Entregado": "Pedidos Finalizados",
+        "Todos": "MOSTRANDO TODOS LOS PEDIDOS",
+        "FiltroPagoPendiente": "Pedidos Activos (PAGOS O ENTREGAS PENDIENTES)",
+        "Entregado": "Pedidos Finalizados (PAGADOS Y ENTREGADOS)",
         "Cancelado": "Pedidos Anulados"
     };
     titulo.textContent = titulos[filtro] || "Pedidos";

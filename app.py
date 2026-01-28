@@ -92,6 +92,19 @@ def agregar_cabeceras(response):
 
 # APARTADO DE AUTH
 
+def verificar_token_google(token):
+    try:
+        idinfo = id_token.verify_oauth2_token(
+            token, 
+            google_requests.Request(), 
+            CLIENT_ID,
+            clock_skew_in_seconds=60
+        )
+        return idinfo
+    except ValueError as e:
+        print(f"Error validando token: {e}")
+        return None
+
 @app.route("/registro-google", methods=["POST"])
 def registro_google():
     token = request.form.get("credential")
@@ -105,7 +118,7 @@ def registro_google():
             token, 
             google_requests.Request(), 
             client_id_env,
-            clock_skew_in_seconds=20
+            clock_skew_in_seconds=60
         )
         
         correo = idinfo['email']
@@ -146,7 +159,7 @@ def registro_google():
         return redirect(url_for('login', success_google="true", nombre=nombre, rol=rol))
         
     except Exception as e:
-        return redirect(url_for('login', error=str(e)))    
+        return redirect(url_for('login', error=str(e)))
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -1515,7 +1528,7 @@ if __name__ == "__main__":
     port = 8000
     local_ip = get_local_ip()
 
-    debug_mode = False
+    debug_mode = True
 
     if debug_mode:
         print("⚡ Ejecutando en modo DEBUG con servidor de desarrollo de Flask")
