@@ -216,7 +216,7 @@ async function cargarPedidos(isAutoRefresh = false) {
             if (detectados.length > 0) {
                 const idNotificar = detectados[0];
                 const pedidoData = pedidos.find(p => String(p.id_pedido) === idNotificar);
-                const nombreCliente = pedidoData?.usuarios?.nombre || "Un cliente";
+                const nombreCliente = `${pedidoData?.usuarios?.nombre || "Un"} ${pedidoData?.usuarios?.apellido || "cliente"}`;
                 showMessage(`⚠️ EL CLIENTE ${nombreCliente.toUpperCase()} HA ANULADO EL PEDIDO #${idNotificar}`);
             }
         }
@@ -287,12 +287,22 @@ async function cargarPedidos(isAutoRefresh = false) {
                         </div>
                     </div>
                     <div class="card-body pt-0">
-                        <div class="mb-2 border-top pt-2">
-                            <small class="d-block"><strong>Cliente:</strong> ${user.nombre || 'Sin nombre'}</small>
+                        <div class="mb-2 border-top pt-2" style="font-size:0.85rem">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p class="mb-1"><strong>Cliente:</strong> ${user.nombre || ''} ${user.apellido || ''}</p>
+                                    <p class="mb-1"><strong>Cédula:</strong> ${user.cedula || 'N/A'}</p>
+                                    <p class="mb-1"><strong>Teléfono:</strong> ${user.telefono || 'N/A'}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p class="mb-1"><strong>Dirección:</strong> ${pedido.direccion_envio || user.direccion || 'N/A'}</p>
+                                    <p class="mb-1"><strong>Método Pago:</strong> <span class="badge bg-info text-dark">${pedido.metodo_pago || 'No especificado'}</span></p>
+                                </div>
+                            </div>
                         </div>
                         <div class="table-responsive-container">
                             <table class="table table-sm text-center mb-0">
-                                <thead><tr><th class="text-start">Productos</th><th>Cantidad</th><th>Subtotal</th><th>Pago?</th></tr></thead>
+                                <thead><tr><th class="text-start">Productos</th><th>Cant.</th><th>Subtotal</th><th>Pago?</th></tr></thead>
                                 <tbody>${itemsRowsHTML}</tbody>
                                 <tfoot class="table-light">
                                     <tr>

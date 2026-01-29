@@ -606,18 +606,24 @@ function lanzarNotificacionMultidispositivo(fObj, estado) {
     playNotificationSound();
     
     const facturaFormateada = generarReferenciaVisual(fObj);
+    const estadoL = estado.toLowerCase();
+    
     let configuracion = {
         color: "primary",
         icono: "bi-info-circle-fill",
         titulo: "Actualización de Pedido"
     };
 
-    if (estado === "Anulada") {
+    if (["anulada", "cancelado", "cancelada"].includes(estadoL)) {
         configuracion = { color: "danger", icono: "bi-x-circle-fill", titulo: "Pedido Anulado" };
-    } else if (estado === "Pagada" || estado === "Pagado") {
+    } else if (["pagada", "pagado"].includes(estadoL)) {
         configuracion = { color: "success", icono: "bi-check-circle-fill", titulo: "Pago Confirmado" };
-    } else if (estado === "Emitida" || estado === "Emitido") {
+    } else if (["emitida", "emitido"].includes(estadoL)) {
         configuracion = { color: "info", icono: "bi-send-fill", titulo: "Pedido Emitido" };
+    } else if (estadoL === "enviado") {
+        configuracion = { color: "warning", icono: "bi-truck", titulo: "Pedido en Camino" };
+    } else if (["finalizado", "entregado"].includes(estadoL)) {
+        configuracion = { color: "info", icono: "bi-house-check-fill", titulo: "Pedido Entregado" };
     }
 
     if (Notification.permission === "granted") {
@@ -634,6 +640,7 @@ function lanzarNotificacionMultidispositivo(fObj, estado) {
     t.className = `custom-toast bg-dark text-white border-0 shadow-lg mb-2`;
     t.style.borderLeft = `5px solid var(--bs-${configuracion.color})`;
     t.style.minWidth = "300px";
+    t.style.transition = "opacity 0.4s ease";
     
     t.innerHTML = `
         <div class="d-flex align-items-center p-2">
@@ -641,16 +648,18 @@ function lanzarNotificacionMultidispositivo(fObj, estado) {
             <div class="flex-grow-1">
                 <strong style="font-size: 0.85rem;" class="d-block">${configuracion.titulo}</strong>
                 <small class="text-white-50">Factura ${facturaFormateada}: </small>
-                <span class="badge bg-${configuracion.color}" style="font-size: 0.65rem;">${estado}</span>
+                <span class="badge bg-${configuracion.color} text-dark" style="font-size: 0.65rem;">${estado.toUpperCase()}</span>
             </div>
             <i class="bi bi-x-lg ms-2 btn-close-toast" style="cursor:pointer; font-size: 0.7rem;"></i>
         </div>`;
         
     cont.appendChild(t);
+
     const remove = () => {
         t.style.opacity = '0';
         setTimeout(() => t.remove(), 400);
     };
+
     t.querySelector('.btn-close-toast').onclick = remove;
     setTimeout(remove, 7000);
 }
@@ -670,6 +679,8 @@ function generarNumeroFactura(idPedido, fecha) {
     }
     return `F-${year}-${contadorFacturasPorAnio[key]}`;
 }
+
+let estadosFacturasPrevios = {};
 
 function mostrarFacturasBuscadas() {
     const container = document.getElementById("facturasContainer");
@@ -692,8 +703,22 @@ function mostrarFacturasBuscadas() {
         }
 
         const estadoNormalizado = f.estado ? f.estado.toLowerCase() : "";
-        const matchEstado = filtroEstado === "" || estadoNormalizado === filtroEstado.toLowerCase();
         
+        const idFacturaStr = String(f.id_factura);
+        const esAnuladaAhora = ["anulada", "cancelado", "cancelada"].includes(estadoNormalizado);
+        
+        if (estadosFacturasPrevios[idFacturaStr] !== undefined) {
+            const estadoAnterior = estadosFacturasPrevios[idFacturaStr];
+            const eraAnulada = ["anulada", "cancelado", "cancelada"].includes(estadoAnterior.toLowerCase());
+            
+            if (esAnuladaAhora && !eraAnulada) {
+                const numFact = generarNumeroFactura(f.id_factura, f.fecha_emision);
+                showMessage(` EL PEDIDO ${numFact} HA SIDO CANCELADO`);
+            }
+        }
+        estadosFacturasPrevios[idFacturaStr] = estadoNormalizado;
+
+        const matchEstado = filtroEstado === "" || estadoNormalizado === filtroEstado.toLowerCase();
         const usuario = f.usuarios || {};
         const nombreCompleto = `${usuario.nombre || ''} ${usuario.apellido || ''}`.toLowerCase();
         const cedulaUsuario = String(usuario.cedula || '');
