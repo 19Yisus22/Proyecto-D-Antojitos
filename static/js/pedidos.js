@@ -251,6 +251,12 @@ async function cargarPedidos(isAutoRefresh = false) {
             card.className = `pedido-card card-collapsed col-12 mb-3 p-1 shadow-sm ${estadoClase} ${esFijado ? 'fijado border-primary' : ''}`;
             card.id = `pedido-${pedido.id_pedido}`;
 
+            card.dataset.id_real = idPedidoStr;
+            card.dataset.factura = normalizarTexto(facturaFormateada);
+            card.dataset.estado = pedido.estado;
+            card.dataset.todosPagos = todosPagos.toString();
+            card.dataset.fijado = esFijado.toString();
+
             const fechaStr = pedido.fecha_pedido ? new Date(pedido.fecha_pedido).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' }) : '---';
 
             card.innerHTML = `
@@ -299,7 +305,6 @@ async function cargarPedidos(isAutoRefresh = false) {
                     </div>
                 </div>`;
 
-            // Configurar eventos de iconos de pago
             card.querySelectorAll(".toggle-pago-item").forEach(icon => {
                 if (bloqueado) return;
                 icon.onclick = async () => {
@@ -324,7 +329,6 @@ async function cargarPedidos(isAutoRefresh = false) {
                 };
             });
 
-            // Resto de eventos (fijar, eliminar, toggle)
             card.querySelector(".btn-fijar").onclick = () => {
                 pedidosFijados = pedidosFijados.includes(idPedidoStr) ? pedidosFijados.filter(id => id !== idPedidoStr) : [...pedidosFijados, idPedidoStr];
                 localStorage.setItem("pedidosFijados", JSON.stringify(pedidosFijados));
