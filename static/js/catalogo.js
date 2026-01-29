@@ -302,11 +302,11 @@ function renderProductos(filterText = '') {
             <div class="accordion border-0 shadow-sm" style="border-radius: 15px; overflow: hidden;">
                 <div class="accordion-item border-0">
                     <h2 class="accordion-header">
-                        <button class="accordion-button fw-bold text-dark" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFavoritosSec" style="background-color: #fff9f0;">
+                        <button class="accordion-button fw-bold text-dark collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFavoritosSec" style="background-color: #fff9f0;">
                             <i class="bi bi-heart-fill text-danger me-2"></i> TUS FAVORITOS (${listaFavoritos.length})
                         </button>
                     </h2>
-                    <div id="collapseFavoritosSec" class="accordion-collapse collapse show">
+                    <div id="collapseFavoritosSec" class="accordion-collapse collapse">
                         <div class="accordion-body px-0" style="background-color: #fffdfa;">
                             <div class="row g-4 px-3" id="contenedorInternoFavoritos"></div>
                         </div>

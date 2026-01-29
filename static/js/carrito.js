@@ -394,8 +394,20 @@ async function cargarCarrito() {
 
         if (!data.productos || data.productos.length === 0) {
             container.innerHTML = '<div class="p-5 text-center text-muted"><i class="bi bi-cart-x fs-1"></i><p class="mt-2">El carrito está vacío</p></div>';
-            if (btn) btn.style.display = "none";
+            if (btn) {
+                btn.style.display = "none";
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-send me-2"></i> Enviar Pedido';
+            }
             return;
+        }
+
+        if (btn) {
+            btn.style.display = "inline-block";
+            if (!btn.innerHTML.includes("spinner-border")) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-send me-2"></i> Enviar Pedido';
+            }
         }
 
         let totalGeneral = 0;
@@ -430,7 +442,7 @@ async function cargarCarrito() {
             
             const imgPath = item.imagen || item.imagen_url;
             const fotoHtml = imgPath 
-                ? `<img src="${imgPath}" class="img-preview" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'img-placeholder\'><i class=\'bi bi-box\'></i></div>';">`
+                ? `<img src="${imgPath}" class="img-preview" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'img-placeholder\\'><i class=\\'bi bi-box\\'></i></div>';">`
                 : `<div class="img-placeholder"><i class="bi bi-box"></i></div>`;
 
             tr.innerHTML = `
@@ -445,7 +457,6 @@ async function cargarCarrito() {
             tr.querySelector(".btn-quitar").onclick = async (e) => {
                 const btnQuitar = e.currentTarget;
                 btnQuitar.disabled = true;
-                
                 tr.classList.add("removing");
 
                 const r = await fetch(`/carrito_quitar/${item.id_carrito}`, { method: "DELETE" });
@@ -464,9 +475,10 @@ async function cargarCarrito() {
 
         const totalEl = document.getElementById("totalCarritoFinal");
         if (totalEl) totalEl.textContent = totalGeneral.toLocaleString('es-CO',{style:'currency',currency:'COP', maximumFractionDigits: 0});
-        if (btn) btn.style.display = "inline-block";
 
-    } catch(e) { console.error(e); }
+    } catch(e) { 
+        console.error(e); 
+    }
 }
 
 function actualizarContadorBadge(total) {
@@ -493,7 +505,8 @@ function actualizarContadorBadge(total) {
 async function finalizarCompra() {
     const btn = document.getElementById("btnFinalizarCompra");
     if (!btn) return;
-    const originalText = btn.innerHTML;
+    
+    const originalText = `<i class="bi bi-send me-2"></i> Enviar Pedido`;
     btn.disabled = true;
     btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Procesando...`;
 
@@ -502,19 +515,20 @@ async function finalizarCompra() {
             method: "POST",
             headers: { "Content-Type": "application/json" }
         });
+        
         const data = await res.json();
 
         if (!res.ok) {
             if (res.status === 400 && data.completar_perfil) {
-                showMessage(data.message, true);
+                showMessage(data.message);
                 setTimeout(() => { window.location.href = "/mi_perfil"; }, 1000);
             } else if (res.status === 400 && data.stock_insuficiente) {
-                showMessage(data.message, true);
+                showMessage(data.message);
                 btn.disabled = false;
                 btn.innerHTML = originalText;
                 await cargarCarrito();
             } else {
-                showMessage(data.message || "Error al procesar el pedido", true);
+                showMessage(data.message || "Error al procesar el pedido");
                 btn.disabled = false;
                 btn.innerHTML = originalText;
             }
@@ -522,14 +536,29 @@ async function finalizarCompra() {
         }
 
         showMessage("¡Pedido enviado con éxito!");
+        
         actualizarContadorBadge(0);
         productosCarrito = [];
+        
+        const modalElement = document.getElementById('modalCarrito');
+        if (modalElement) {
+            const modalInstance = bootstrap.Modal.getInstance(modalElement);
+            if (modalInstance) {
+                modalInstance.hide();
+            }
+        }
+
         await cargarCarrito();
         
     } catch (error) {
-        showMessage("Error de conexión con el servidor", true);
+        showMessage("Error de conexión con el servidor");
         btn.disabled = false;
         btn.innerHTML = originalText;
+    } finally {
+        if (btn && btn.innerHTML.includes("Procesando") && (typeof productosCarrito !== 'undefined' && productosCarrito.length > 0)) {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
     }
 }
 
@@ -651,8 +680,20 @@ function mostrarFacturasBuscadas() {
     const busquedaNombre = document.getElementById("inputBusquedaNombre")?.value.toLowerCase().trim() || "";
     const busquedaCedula = document.getElementById("inputBusquedaCedula")?.value.trim() || "";
     
+    const ocultas = JSON.parse(localStorage.getItem('facturas_ocultas') || "[]");
+
     let filtradas = facturasActuales.filter(f => {
-        const matchEstado = filtroEstado === "" || f.estado === filtroEstado;
+        if (ocultas.includes(f.id_factura)) return false;
+
+        const idPropietario = f.id_cliente || (f.usuarios ? f.usuarios.id_usuario : null);
+        
+        if (typeof idUsuarioLogueado !== 'undefined' && idUsuarioLogueado !== null) {
+            if (String(idPropietario) !== String(idUsuarioLogueado)) return false;
+        }
+
+        const estadoNormalizado = f.estado ? f.estado.toLowerCase() : "";
+        const matchEstado = filtroEstado === "" || estadoNormalizado === filtroEstado.toLowerCase();
+        
         const usuario = f.usuarios || {};
         const nombreCompleto = `${usuario.nombre || ''} ${usuario.apellido || ''}`.toLowerCase();
         const cedulaUsuario = String(usuario.cedula || '');
@@ -666,105 +707,109 @@ function mostrarFacturasBuscadas() {
     const paginadas = filtradas.slice((paginaActual - 1) * itemsPorPagina, paginaActual * itemsPorPagina);
 
     if (paginadas.length === 0) {
-        container.innerHTML = '<div class="text-center p-5 text-muted bg-white rounded-4 shadow-sm"><i class="bi bi-search fs-1"></i><p class="mt-2">No se encontraron registros</p></div>';
+        container.innerHTML = `
+            <div class="text-center p-5 text-muted bg-white rounded-4 shadow-sm">
+                <i class="bi bi-search fs-1"></i>
+                <p class="mt-2">No se encontraron facturas vinculadas a su cuenta</p>
+            </div>`;
         return;
     }
 
     paginadas.forEach((f) => {
         const card = document.createElement("div");
+        const estadoRaw = f.estado || "";
         
-        const esPagada = (f.estado === 'Pagado' || f.estado === 'Pagada' || f.estado === 'Finalizado' || f.estado === 'Enviado');
-        const esAnulada = (f.estado === 'Anulada' || f.estado === 'Cancelado');
+        const esPagada = ["pagado", "pagada", "finalizado", "entregado", "enviado"].includes(estadoRaw.toLowerCase());
+        const esAnulada = ["anulada", "cancelado", "cancelada"].includes(estadoRaw.toLowerCase());
         const esEstadoFinal = esPagada || esAnulada;
-        
-        card.className = `factura-card ${esEstadoFinal ? 'factura-bloqueada' : ''} fade-in-item`;
         
         const facturaFormateada = generarNumeroFactura(f.id_factura, f.fecha_emision);
 
         let detalleHtml = "";
         let totalCalculado = 0;
         (f.productos || []).forEach(p => {
-            totalCalculado += Number(p.subtotal);
+            const sub = Number(p.subtotal || 0);
+            totalCalculado += sub;
             detalleHtml += `
-                <div class="item-row">
-                    <span class="text-dark">${p.nombre_producto}</span>
+                <div class="item-row d-flex justify-content-between border-bottom py-1">
+                    <span class="text-dark text-truncate" style="max-width: 150px;">${p.nombre_producto}</span>
                     <span class="text-muted small">x${p.cantidad}</span>
-                    <span class="fw-bold">${Number(p.subtotal).toLocaleString('es-CO', {style: 'currency', currency: 'COP', maximumFractionDigits: 0})}</span>
+                    <span class="fw-bold">${sub.toLocaleString('es-CO', {style: 'currency', currency: 'COP', maximumFractionDigits: 0})}</span>
                 </div>`;
         });
 
         let colorBadge = "primary";
         let iconoEstado = "bi-clock-history";
-        let textoEstadoMostrar = f.estado;
+        let textoEstadoMostrar = estadoRaw;
 
         if (esAnulada) {
             colorBadge = "danger";
             iconoEstado = "bi-x-circle";
+            textoEstadoMostrar = "ANULADA";
         } else if (esPagada) {
             colorBadge = "success";
             iconoEstado = "bi-check-circle-fill";
             textoEstadoMostrar = "PAGADA"; 
-        } else if (f.estado === "Emitido" || f.estado === "Emitida") {
+        } else if (estadoRaw.toLowerCase().includes("emitid")) {
             colorBadge = "info";
             iconoEstado = "bi-send";
         }
 
+        card.className = `card card-factura mb-4 shadow-sm ${esEstadoFinal ? 'factura-bloqueada' : ''}`;
+        card.id = `factura-card-${f.id_factura}`;
         card.innerHTML = `
-            <div class="factura-header">
+            <div class="factura-header p-3 border-bottom">
                 <div class="d-flex justify-content-between align-items-center">
                     <div class="d-flex align-items-center">
-                        <div class="rounded-circle bg-dark text-white d-flex align-items-center justify-content-center me-3" style="width:45px; height:45px;">
+                        <div class="rounded-circle bg-dark text-white d-flex align-items-center justify-content-center me-3" style="width:40px; height:40px;">
                             <i class="bi bi-receipt fs-5"></i>
                         </div>
                         <div>
-                            <h6 class="fw-bold mb-0">Factura ${facturaFormateada}</h6>
-                            <small class="text-primary fw-bold" style="font-size: 0.75rem;">CC: ${f.usuarios?.cedula || 'No registrada'}</small>
+                            <h6 class="fw-bold mb-0">${facturaFormateada}</h6>
+                            <small class="text-primary fw-bold">CC: ${f.usuarios?.cedula || 'No registrada'}</small>
                         </div>
                     </div>
-                    <span class="badge badge-status bg-${colorBadge} d-flex align-items-center gap-1">
+                    <span class="badge bg-${colorBadge} d-flex align-items-center gap-1 py-2 px-3 rounded-pill">
                         <i class="bi ${iconoEstado}"></i> ${textoEstadoMostrar.toUpperCase()}
                     </span>
                 </div>
             </div>
-            <div class="factura-body">
-                <div class="mb-2 small text-uppercase text-muted fw-bold" style="letter-spacing: 1px;">Resumen del pedido</div>
-                <div class="lista-productos">
-                    ${detalleHtml}
+            <div class="card-body p-3">
+                <div class="mb-2 small text-uppercase text-muted fw-bold" style="letter-spacing: 0.5px;">Resumen del pedido</div>
+                <div class="lista-productos mb-3">${detalleHtml}</div>
+                <div class="text-end border-top pt-2">
+                    <div class="small text-muted mb-0" style="font-size: 0.7rem;">TOTAL NETO: </div>
+                    <div class="fw-bold fs-4 text-primary">${totalCalculado.toLocaleString('es-CO', {style: 'currency', currency: 'COP', maximumFractionDigits: 0})}</div>
                 </div>
-                ${(!esEstadoFinal) ? `
-                    <button class="btn btn-primary w-100 mt-3 fw-bold rounded-pill btn-pagar-modal-factura shadow-sm">
-                        <i class="bi bi-qr-code me-2"></i>Pagar Ahora (Medios de Pago)
-                    </button>
-                ` : `
-                    <div class="mt-3 p-2 border rounded-3 bg-light text-center text-success small fw-bold">
-                        <i class="bi bi-shield-check me-1"></i> ESTADO: ${textoEstadoMostrar.toUpperCase()}
-                    </div>
-                `}
-            </div>
-            <div class="factura-footer">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div class="d-flex gap-2">
-                        <button class="btn btn-sm btn-dark px-3 btn-pdf-action">
-                            <i class="bi bi-file-earmark-pdf"></i> PDF
+                <div class="mt-3 seccion-accion">
+                    ${(!esEstadoFinal) ? `
+                        <button class="btn btn-primary w-100 fw-bold rounded-pill btn-pagar-modal-factura py-2">
+                            <i class="bi bi-qr-code me-2"></i>Pagar Ahora
                         </button>
-                        ${(!esEstadoFinal) ? 
-                            `<button class="btn btn-sm btn-outline-danger px-3 fw-bold btn-anular-action">Anular</button>` : 
-                            `<button class="btn btn-sm btn-link text-muted text-decoration-none btn-eliminar-action"><i class="bi bi-trash"></i> Quitar</button>`
-                        }
-                    </div>
-                    <div class="text-end">
-                        <div class="small text-muted mb-0" style="font-size: 0.7rem;">TOTAL NETO</div>
-                        <div class="fw-bold fs-5 text-primary">${totalCalculado.toLocaleString('es-CO', {style: 'currency', currency: 'COP', maximumFractionDigits: 0})}</div>
-                    </div>
+                    ` : `
+                        <div class="p-2 border rounded-3 bg-light text-center ${esAnulada ? 'text-danger' : 'text-success'} small fw-bold">
+                            <i class="bi ${esAnulada ? 'bi-x-octagon' : 'bi-shield-check'} me-1"></i> ${esAnulada ? 'PEDIDO CANCELADO' : 'TRANSACCIÓN FINALIZADA'}
+                        </div>
+                    `}
+                </div>
+            </div>
+            <div class="card-footer bg-transparent border-top-0 p-3">
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-dark flex-grow-1 btn-pdf-action">
+                        <i class="bi bi-file-earmark-pdf"></i> PDF
+                    </button>
+                    ${(!esEstadoFinal) ? 
+                        `<button class="btn btn-sm btn-outline-danger flex-grow-1 btn-anular-action">Anular</button>` : 
+                        `<button class="btn btn-sm btn-link text-muted text-decoration-none flex-grow-1 btn-eliminar-action"><i class="bi bi-trash"></i> Quitar</button>`
+                    }
                 </div>
             </div>`;
         
-        const btnPagar = card.querySelector('.btn-pagar-modal-factura');
-        if (btnPagar) {
-            btnPagar.addEventListener('click', (e) => {
+        if (card.querySelector('.btn-pagar-modal-factura')) {
+            card.querySelector('.btn-pagar-modal-factura').onclick = (e) => {
                 e.preventDefault();
                 abrirModalPago(facturaFormateada, totalCalculado.toLocaleString('es-CO', {style: 'currency', currency: 'COP', maximumFractionDigits: 0}));
-            });
+            };
         }
 
         card.querySelector('.btn-pdf-action').onclick = () => {
@@ -774,19 +819,30 @@ function mostrarFacturasBuscadas() {
         };
         
         const btnAnular = card.querySelector('.btn-anular-action');
-        if (btnAnular) btnAnular.onclick = () => anularFactura(f.id_factura);
+        if (btnAnular) {
+            btnAnular.onclick = async () => {
+                const exito = await anularFactura(f.id_factura);
+                if (exito) {
+                    f.estado = "Cancelado";
+                    showMessage("Factura anulada con éxito");
+                    setTimeout(() => {
+                        mostrarFacturasBuscadas();
+                    }, 300);
+                }
+            };
+        }
         
         const btnEliminar = card.querySelector('.btn-eliminar-action');
         if (btnEliminar) {
             btnEliminar.onclick = () => {
-                const ocultas = JSON.parse(localStorage.getItem('facturas_ocultas') || "[]");
-                if (!ocultas.includes(f.id_factura)) {
-                    ocultas.push(f.id_factura);
-                    localStorage.setItem('facturas_ocultas', JSON.stringify(ocultas));
+                const actualesOcultas = JSON.parse(localStorage.getItem('facturas_ocultas') || "[]");
+                if (!actualesOcultas.includes(f.id_factura)) {
+                    actualesOcultas.push(f.id_factura);
+                    localStorage.setItem('facturas_ocultas', JSON.stringify(actualesOcultas));
                 }
                 facturasActuales = facturasActuales.filter(fact => fact.id_factura !== f.id_factura);
                 mostrarFacturasBuscadas();
-                showMessage("Factura ocultada de la vista");
+                showMessage("Vista actualizada");
             };
         }
         
@@ -796,22 +852,26 @@ function mostrarFacturasBuscadas() {
 }
 
 async function anularFactura(idFactura) {
-    showConfirmToast("¿Estás seguro de que deseas anular este pedido?", async () => {
-        try {
-            const res = await fetch(`/facturas/${idFactura}/anular`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" }
-            });
-            const data = await res.json();
-            if (res.ok) {
-                showMessage("Pedido anulado correctamente");
-                await monitorearCambiosFacturas();
-            } else {
-                showMessage(data.message || "No se pudo anular el pedido", true);
+    return new Promise((resolve) => {
+        showConfirmToast("¿Estás seguro de que deseas anular este pedido?", async () => {
+            try {
+                const res = await fetch(`/facturas/${idFactura}/anular`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" }
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    if (typeof monitorearCambiosFacturas === 'function') await monitorearCambiosFacturas();
+                    resolve(true);
+                } else {
+                    showMessage(data.message || "No se pudo anular", true);
+                    resolve(false);
+                }
+            } catch (error) {
+                showMessage("Error de conexión", true);
+                resolve(false);
             }
-        } catch (error) {
-            showMessage("Error de conexión", true);
-        }
+        });
     });
 }
 

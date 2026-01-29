@@ -138,24 +138,58 @@ body {
 .toast-success { border-left: 5px solid var(--success-bg); }
 .toast-error { border-left: 5px solid var(--danger-bg); }
 
-.factura-card {
-    background: #ffffff;
-    border: 1px solid var(--border-invoice);
-    border-radius: 16px;
+.card-factura {
+    background-color: #ffffff;
+    border: none;
+    border-radius: 4px;
+    position: relative;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    padding-bottom: 25px;
     margin-bottom: 2rem;
-    overflow: hidden;
-    transition: all 0.3s ease;
+    transition: transform 0.3s ease;
 }
 
-.factura-card:hover {
-    box-shadow: 0 10px 25px rgba(0,0,0,0.08);
-    transform: translateY(-3px);
+.card-factura:hover {
+    transform: translateY(-5px);
+}
+
+.card-factura::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 12px;
+    background: linear-gradient(-45deg, #f4f4f4 8px, transparent 0), 
+                linear-gradient(45deg, #f4f4f4 8px, transparent 0);
+    background-position: left bottom;
+    background-size: 16px 16px;
+    background-repeat: repeat-x;
 }
 
 .factura-header {
     background: #fff;
     padding: 1.2rem;
-    border-bottom: 1px dashed #dee2e6;
+    border-bottom: 1px dashed var(--border-invoice);
+}
+
+.factura-body {
+    padding: 1.5rem;
+}
+
+.factura-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #f8f9fa;
+}
+
+.divisor-pago {
+    margin: 2rem 0 1.5rem 0;
+    border-top: 1px dashed var(--border-invoice);
+}
+
+.lista-productos {
+    max-height: 300px;
+    overflow-y: auto;
 }
 
 @keyframes shake {
@@ -210,5 +244,9 @@ footer, .footer {
     .custom-toast {
         min-width: auto;
         width: 95%;
+    }
+    
+    .card-factura {
+        margin-bottom: 1.5rem;
     }
 }

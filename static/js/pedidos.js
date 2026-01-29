@@ -4,6 +4,7 @@ const itemsPorPagina = 5;
 let pedidosGlobal = [];
 let pedidosDatosRaw = [];
 let pedidosFiltrados = [];
+let ultimosIdsCancelados = [];
 let pedidosCanceladosVerificados = JSON.parse(localStorage.getItem("pedidosCanceladosVerificados") || "[]");
 let estadosPagoGuardados = JSON.parse(localStorage.getItem("estadosPagoItems") || "{}");
 let pedidosFijados = JSON.parse(localStorage.getItem("pedidosFijados") || "[]");
@@ -200,34 +201,46 @@ function actualizarTituloTabla() {
 }
 
 async function cargarPedidos(isAutoRefresh = false) {
-    const algunaAbierta = document.querySelector('.pedido-card:not(.card-collapsed)');
     const algunInputFocado = document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'SELECT';
-    if (isAutoRefresh && (algunaAbierta || algunInputFocado)) return;
+    if (isAutoRefresh && algunInputFocado) return;
 
     try {
         const res = await fetch("/obtener_pedidos");
         const pedidos = await res.json();
         if (!Array.isArray(pedidos)) return;
 
+        const nuevosCancelados = pedidos.filter(p => p.estado === 'Cancelado').map(p => String(p.id_pedido));
+        
+        if (isAutoRefresh && typeof ultimosIdsCancelados !== 'undefined' && ultimosIdsCancelados.length > 0) {
+            const detectados = nuevosCancelados.filter(id => !ultimosIdsCancelados.includes(id));
+            if (detectados.length > 0) {
+                const idNotificar = detectados[0];
+                const pedidoData = pedidos.find(p => String(p.id_pedido) === idNotificar);
+                const nombreCliente = pedidoData?.usuarios?.nombre || "Un cliente";
+                showMessage(`⚠️ EL CLIENTE ${nombreCliente.toUpperCase()} HA ANULADO EL PEDIDO #${idNotificar}`);
+            }
+        }
+        ultimosIdsCancelados = nuevosCancelados;
+
         pedidosDatosRaw = pedidos;
         
-        pedidosGlobal = pedidos.map(pedido => {
-            const facturaFormateada = generarNumeroFactura(pedido.id_pedido, pedido.fecha_pedido);
-            const card = document.createElement("div");
+        const nuevasCards = pedidos.map(pedido => {
             const idPedidoStr = String(pedido.id_pedido);
+            const facturaFormateada = generarNumeroFactura(pedido.id_pedido, pedido.fecha_pedido);
             const esFijado = pedidosFijados.includes(idPedidoStr);
             const user = pedido.usuarios || {};
             
+            const cardExistente = document.getElementById(`pedido-${pedido.id_pedido}`);
+            const estabaAbierta = cardExistente ? !cardExistente.classList.contains('card-collapsed') : false;
+
+            const card = document.createElement("div");
             let totalPendientePedido = 0;
 
             const itemsRowsHTML = (pedido.pedido_detalle || []).map((item, idx) => {
                 const itemId = `${pedido.id_pedido}-${idx}`;
                 let pagadoItem = estadosPagoGuardados[itemId] !== undefined ? estadosPagoGuardados[itemId] : (item.pagado !== undefined ? item.pagado : pedido.pagado);
-                
                 const subtotal = Number(item.subtotal || 0);
-                if (!pagadoItem) {
-                    totalPendientePedido += subtotal;
-                }
+                if (!pagadoItem) totalPendientePedido += subtotal;
 
                 return `<tr>
                     <td class="text-start">${item.gestion_productos?.nombre || item.nombre_producto || 'Producto'}</td>
@@ -245,12 +258,10 @@ async function cargarPedidos(isAutoRefresh = false) {
             const esTerminado = pedido.estado === 'Entregado' && todosPagos;
             const esAnulado = pedido.estado === 'Cancelado';
             const bloqueado = esTerminado || esAnulado;
+            let estadoClase = esAnulado ? "pedido-anulado border-danger" : (esTerminado ? "pedido-finalizado" : "pedido-activo");
 
-            let estadoClase = esAnulado ? "pedido-anulado" : (esTerminado ? "pedido-finalizado" : "pedido-activo");
-
-            card.className = `pedido-card card-collapsed col-12 mb-3 p-1 shadow-sm ${estadoClase} ${esFijado ? 'fijado border-primary' : ''}`;
+            card.className = `pedido-card col-12 mb-3 p-1 shadow-sm ${estadoClase} ${esFijado ? 'fijado border-primary' : ''} ${estabaAbierta ? '' : 'card-collapsed'}`;
             card.id = `pedido-${pedido.id_pedido}`;
-
             card.dataset.id_real = idPedidoStr;
             card.dataset.factura = normalizarTexto(facturaFormateada);
             card.dataset.estado = pedido.estado;
@@ -267,7 +278,7 @@ async function cargarPedidos(isAutoRefresh = false) {
                             <img src="${user.imagen_url || '/static/uploads/default.png'}" class="rounded-circle border" style="width:38px;height:38px;object-fit:cover;">
                             <div class="lh-1">
                                 <strong class="d-block" style="font-size:0.9rem">${facturaFormateada}</strong>
-                                <small class="status-info text-muted" style="font-size:0.75rem">${pedido.estado} | ${fechaStr}</small>
+                                <small class="status-info ${esAnulado ? 'text-danger fw-bold' : 'text-muted'}" style="font-size:0.75rem">${pedido.estado} | ${fechaStr}</small>
                             </div>
                         </div>
                         <div class="d-flex gap-2">
@@ -306,25 +317,22 @@ async function cargarPedidos(isAutoRefresh = false) {
                 </div>`;
 
             card.querySelectorAll(".toggle-pago-item").forEach(icon => {
-                if (bloqueado) return;
                 icon.onclick = async () => {
+                    if (bloqueado) return;
                     const itemId = icon.dataset.itemId;
                     const val = icon.dataset.pagado === 'false';
                     estadosPagoGuardados[itemId] = val;
                     localStorage.setItem("estadosPagoItems", JSON.stringify(estadosPagoGuardados));
-
-                    const currentIcons = Array.from(card.querySelectorAll(".toggle-pago-item"));
-                    const todosPagadosGlobal = currentIcons.every(i => (i.dataset.itemId === itemId ? val : i.dataset.pagado === 'true'));
-
+                    
                     const res = await fetch(`/actualizar_pago/${pedido.id_pedido}`, {
                         method: "PUT",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ pagado: todosPagadosGlobal })
+                        body: JSON.stringify({ pagado: val })
                     });
 
-                    if (res.ok) {
-                        await cargarPedidos();
+                    if (res.ok) { 
                         showMessage("Cobro actualizado");
+                        await cargarPedidos(); 
                     }
                 };
             });
@@ -334,20 +342,32 @@ async function cargarPedidos(isAutoRefresh = false) {
                 localStorage.setItem("pedidosFijados", JSON.stringify(pedidosFijados));
                 aplicarFiltros();
             };
+
             card.querySelector(".btn-eliminar-individual").onclick = async () => {
                 const r = await fetch("/eliminar_pedidos", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: [idPedidoStr] }) });
                 if (r.ok) { showMessage("Pedido eliminado"); await cargarPedidos(); }
             };
-            card.querySelector(".toggle-detalle").onclick = () => card.classList.toggle("card-collapsed");
+
+            card.querySelector(".toggle-detalle").onclick = (e) => {
+                e.stopPropagation();
+                card.classList.toggle("card-collapsed");
+            };
+
             card.querySelector(".actualizar-btn").onclick = async () => {
                 const nuevo = card.querySelector(".estado-select").value;
                 const r = await fetch(`/actualizar_estado/${pedido.id_pedido}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: nuevo }) });
-                if (r.ok) { showMessage(`Estado: ${nuevo}`); await cargarPedidos(); }
+                if (r.ok) { 
+                    showMessage(`Estado: ${nuevo}`); 
+                    await cargarPedidos(); 
+                }
             };
 
             return card;
         });
+
+        pedidosGlobal = nuevasCards;
         aplicarFiltros();
+
     } catch (e) { console.error(e); }
 }
 
@@ -358,7 +378,7 @@ function aplicarFiltros() {
     const busquedaNombre = normalizarTexto(document.getElementById("inputBusquedaNombre")?.value);
     const busquedaCedula = normalizarTexto(document.getElementById("inputBusquedaCedula")?.value);
     
-    pedidosFiltrados = pedidosGlobal.filter(card => {
+    let filtrados = pedidosGlobal.filter(card => {
         const idReal = card.dataset.id_real;
         const pedidoData = pedidosDatosRaw.find(p => String(p.id_pedido) === idReal);
         const user = pedidoData?.usuarios || {};
@@ -384,14 +404,67 @@ function aplicarFiltros() {
         return true;
     });
 
-    pedidosFiltrados.sort((a, b) => {
+    const grupos = {
+        activos: [],
+        finalizados: [],
+        anulados: []
+    };
+
+    filtrados.forEach(card => {
+        const est = card.dataset.estado;
+        const pagos = card.dataset.todosPagos === "true";
+
+        if (est === "Cancelado") {
+            grupos.anulados.push(card);
+        } else if (est === "Entregado" && pagos) {
+            grupos.finalizados.push(card);
+        } else {
+            grupos.activos.push(card);
+        }
+    });
+
+    const ordenarGrupo = (arr) => arr.sort((a, b) => {
         const aF = a.dataset.fijado === "true" ? 1 : 0;
         const bF = b.dataset.fijado === "true" ? 1 : 0;
         if (aF !== bF) return bF - aF;
         return parseInt(b.dataset.id_real) - parseInt(a.dataset.id_real);
     });
 
+    const finalListaConSeparadores = [];
+    
+    if (grupos.activos.length > 0) {
+        finalListaConSeparadores.push(crearSeparador("PEDIDOS ACTIVOS / PENDIENTES", "bg-primary"));
+        finalListaConSeparadores.push(...ordenarGrupo(grupos.activos));
+    }
+    
+    if (grupos.finalizados.length > 0) {
+        finalListaConSeparadores.push(crearSeparador("TRANSACCIONES FINALIZADAS", "bg-success"));
+        finalListaConSeparadores.push(...ordenarGrupo(grupos.finalizados));
+    }
+    
+    if (grupos.anulados.length > 0) {
+        finalListaConSeparadores.push(crearSeparador("PEDIDOS ANULADOS", "bg-danger"));
+        finalListaConSeparadores.push(...ordenarGrupo(grupos.anulados));
+    }
+
+    pedidosFiltrados = finalListaConSeparadores;
     renderizarPaginacion(pedidosFiltrados);
+}
+
+function crearSeparador(texto, claseColor) {
+    const div = document.createElement("div");
+    div.className = "col-12 my-3";
+    div.innerHTML = `
+        <div class="d-flex align-items-center">
+            <div class="flex-grow-1 border-top border-2"></div>
+            <span class="badge ${claseColor} mx-3 py-2 px-4 rounded-pill shadow-sm" style="font-size: 0.85rem; letter-spacing: 1px;">
+                <i class="bi bi-funnel-fill me-2"></i>${texto}
+            </span>
+            <div class="flex-grow-1 border-top border-2"></div>
+        </div>
+    `;
+    div.dataset.esSeparador = "true";
+    return div;
 }
 
 function inicializarSelectAnios() {
