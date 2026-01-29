@@ -2,7 +2,7 @@ let facturasActuales = [];
 let paginaActual = 1;
 const itemsPorPagina = 5;
 let productosCarrito = [];
-let facturasLocalesCache = [];
+let facturasLocalesCache = []; 
 let catalogoLocalCache = [];
 let metodosPagoCache = [];
 

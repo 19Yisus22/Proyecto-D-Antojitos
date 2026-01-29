@@ -5,7 +5,7 @@ const searchInput = document.getElementById("searchInput");
 const toastContainer = document.getElementById("toastContainer");
 const btnCarrito = document.getElementById("btnCarrito");
 const badgeCarrito = document.getElementById("contadorCarritoBadge");
-
+ 
 let productos = [];
 let filtroIndex = 0;
 let contadorCarrito = 0;

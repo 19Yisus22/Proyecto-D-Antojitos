@@ -1,6 +1,6 @@
 const toastContainer = document.getElementById('toastContainer');
 const alertaCancelado = document.getElementById('alertaCancelado');
-const itemsPorPagina = 5;
+const itemsPorPagina = 5; 
 let pedidosGlobal = [];
 let pedidosDatosRaw = [];
 let pedidosFiltrados = [];
