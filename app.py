@@ -90,6 +90,7 @@ def agregar_cabeceras(response):
     response.headers['Access-Control-Allow-Origin'] = '*'
     return response
 
+
 # APARTADO DE AUTH
 
 def verificar_token_google(token):
@@ -928,26 +929,39 @@ def pedidos_page():
 
 @app.route("/obtener_pedidos", methods=["GET"])
 def obtener_pedidos():
-
     user_id = session.get("user_id")
 
     if not user_id:
         return jsonify([]), 401
     
-    pedidos_res = (supabase.table("pedidos").select(""" *, usuarios(id_cliente, nombre, apellido, cedula, telefono, correo, direccion, metodo_pago, imagen_url), pedido_detalle(*, gestion_productos(nombre, precio, imagen_url)) """).order("fecha_pedido", desc=True).execute())
-    pedidos = pedidos_res.data or []
+    query = "*, usuarios(id_cliente, nombre, apellido, cedula, telefono, correo, direccion, metodo_pago, imagen_url), pedido_detalle(*, gestion_productos(nombre, precio, imagen_url))"
+    
+    try:
+        pedidos_res = (
+            supabase.table("pedidos")
+            .select(query)
+            .order("fecha_pedido", desc=True)
+            .execute()
+        )
+        pedidos = pedidos_res.data or []
 
-    for p in pedidos:
-        if p.get("estado") == "Pendiente":
-            p["estado_factura"] = "Emitida"
-        elif p.get("estado") == "Entregado" and p.get("pagado"):
-            p["estado_factura"] = "Pagada"
-        elif p.get("estado") == "Cancelado":
-            p["estado_factura"] = "Anulada"
-        else:
-            p["estado_factura"] = "Emitida"
-            
-    return jsonify(pedidos)
+        for p in pedidos:
+            estado = p.get("estado")
+            pagado = p.get("pagado")
+
+            if estado == "Pendiente":
+                p["estado_factura"] = "Emitida"
+            elif estado == "Entregado" and pagado:
+                p["estado_factura"] = "Pagada"
+            elif estado == "Cancelado":
+                p["estado_factura"] = "Anulada"
+            else:
+                p["estado_factura"] = "Emitida"
+                
+        return jsonify(pedidos), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/enviar_pedido", methods=["POST"])
 def enviar_pedido():
