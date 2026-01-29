@@ -1,7 +1,102 @@
 let metodosPagoArray = [];
 let editIndex = -1;
 
-const IMG_DEFAULT = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 24 24' fill='none' stroke='%23ccc' stroke-width='1' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2' ry='2'%3E%3C/rect%3E%3Cline x1='3' y1='9' x2='21' y2='9'%3E%3C/line%3E%3Cline x1='9' y1='21' x2='9' y2='9'%3E%3C/line%3E%3Cpath d='M7 14l2 2 4-4'%3E%3C/path%3E%3C/svg%3E";
+const IMG_DEFAULT = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAJQAAACUCAYAAAB1OacDAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAJBSURBVHgB7d0xbhNREIDh90YpSClpSInS06ByAnp6SByBk9ByAnp6ChonSInS06ByApSClpSClpSChv9vYScbe9be9Xp3Z76Pst6stZun8f72zZunMREp6vUf97ZOfn64fP9scfH+mYgG9fbt+6f7n8/vXrz6eC6isfrz5p8mIkW9e/dhIu6IKOp8+SyiqPP7DyIa9PHe2XfTjMREpKgzmYh9Ihp0/vEisS+isfrtHxEfXkU06uXFpyciGrW9efZ0Ihp0t3k6EQ26ubqbiCtiIjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIynL17/wEunS4O3C+hNwAAAABJRU5ErkJggg==";
+
+document.addEventListener('DOMContentLoaded', async () => {
+    const tieneAcceso = await verificarAccesoAdmin();
+    if (!tieneAcceso) return;
+
+    cargarMetodosDesdeHTML();
+    escucharEventosTiempoReal();
+
+    const archivoQR = document.getElementById('archivoQR');
+    const previewImg = document.getElementById('previewPagoImg');
+
+    if (archivoQR && previewImg) {
+        archivoQR.addEventListener('change', function(e) {
+            if (this.files && this.files[0]) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    previewImg.src = e.target.result;
+                };
+                reader.readAsDataURL(this.files[0]);
+            } else {
+                previewImg.src = IMG_DEFAULT;
+            }
+        });
+    }
+
+    const btnGuardar = document.getElementById('btnGuardarPagos');
+    if (btnGuardar) {
+        btnGuardar.addEventListener('click', guardarCambiosPagos);
+    }
+    
+    const btnAgregar = document.getElementById('btnAgregarTemporal');
+    if (btnAgregar) {
+        btnAgregar.addEventListener('click', agregarMetodoPago);
+    }
+
+    document.addEventListener('change', async (e) => {
+        if (e.target.classList.contains('check-pago')) {
+            const idPedido = e.target.dataset.id;
+            const estaPagado = e.target.checked;
+            try {
+                const response = await fetch(`/actualizar_pago/${idPedido}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pagado: estaPagado })
+                });
+                const result = await response.json();
+                if (!response.ok) {
+                    e.target.checked = !estaPagado;
+                    showMessage(result.error || "Error al actualizar", true);
+                } else {
+                    showMessage("Estado de pago actualizado", false);
+                }
+            } catch (error) {
+                e.target.checked = !estaPagado;
+                showMessage("Error de comunicación con el servidor", true);
+            }
+        }
+    });
+});
+
+function showMessage(msg, isError = false) {
+    let container = document.getElementById('toastContainer');
+    if (!container) {
+        container = document.createElement("div");
+        container.id = "toastContainer";
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `custom-toast animate__animated animate__fadeInRight`;
+    
+    const icon = isError ? 'bi-exclamation-triangle-fill' : 'bi-check-circle-fill';
+    
+    toast.innerHTML = `
+        <div class="toast-content">
+            <div class="toast-icon-wrapper">
+                <i class="bi ${icon}"></i>
+            </div>
+            <div class="toast-text">
+                <span class="toast-main-text">${msg}</span>
+            </div>
+            <i class="bi bi-x-lg toast-close btn-close-toast"></i>
+        </div>
+    `;
+    
+    container.appendChild(toast);
+
+    const remove = () => {
+        toast.classList.replace('animate__fadeInRight', 'animate__fadeOutRight');
+        setTimeout(() => toast.remove(), 400);
+    };
+
+    toast.querySelector('.btn-close-toast').onclick = remove;
+    setTimeout(remove, 4000);
+}
 
 async function verificarAccesoAdmin() {
     try {
@@ -38,35 +133,16 @@ async function verificarAccesoAdmin() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
-    const tieneAcceso = await verificarAccesoAdmin();
-    if (!tieneAcceso) return;
-
-    cargarMetodosDesdeHTML();
-
-    const archivoQR = document.getElementById('archivoQR');
-    if (archivoQR) {
-        archivoQR.addEventListener('change', function(e) {
-            if (this.files && this.files[0]) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    document.getElementById('previewPagoImg').src = e.target.result;
-                };
-                reader.readAsDataURL(this.files[0]);
-            }
-        });
-    }
-
-    const btnGuardar = document.getElementById('btnGuardarPagos');
-    if (btnGuardar) {
-        btnGuardar.addEventListener('click', guardarCambiosPagos);
-    }
-    
-    const btnAgregar = document.getElementById('btnAgregarTemporal');
-    if (btnAgregar) {
-        btnAgregar.addEventListener('click', agregarMetodoPago);
-    }
-});
+function escucharEventosTiempoReal() {
+    window.addEventListener('storage', (e) => {
+        if (e.key === 'nuevoPedidoDetectado') {
+            showMessage("¡Nuevo pedido detectado!", false);
+        }
+        if (e.key === 'pedidoAnuladoRecientemente') {
+            showMessage("Un pedido ha sido anulado", true);
+        }
+    });
+}
 
 function cargarMetodosDesdeHTML() {
     const res = document.getElementById('metodos_iniciales_data');
@@ -97,7 +173,7 @@ function agregarMetodoPago() {
     const fileInput = document.getElementById('archivoQR');
 
     if (!numero || !titular) {
-        mostrarToastApp("Complete número y titular", "warning");
+        showMessage("Debes completar número y titular", true);
         return;
     }
 
@@ -114,10 +190,10 @@ function agregarMetodoPago() {
 
     if (editIndex !== -1) {
         metodosPagoArray[editIndex] = datosMetodo;
-        mostrarToastApp("Método actualizado correctamente", "info");
+        showMessage("Método actualizado en la lista");
     } else {
         metodosPagoArray.push(datosMetodo);
-        mostrarToastApp("Añadido a la lista de espera", "info");
+        showMessage("Añadido a la lista de espera");
     }
 
     resetearFormulario();
@@ -133,16 +209,15 @@ function editarMetodo(index) {
     document.getElementById('numeroCuenta').value = m.numero;
     document.getElementById('titularCuenta').value = m.titular;
 
+    const preview = document.getElementById('previewPagoImg');
     if (m.file) {
-        document.getElementById('previewPagoImg').src = URL.createObjectURL(m.file);
-    } else if (m.url_actual) {
-        document.getElementById('previewPagoImg').src = m.url_actual;
+        preview.src = URL.createObjectURL(m.file);
     } else {
-        document.getElementById('previewPagoImg').src = IMG_DEFAULT;
+        preview.src = m.url_actual || IMG_DEFAULT;
     }
 
     const btn = document.getElementById('btnAgregarTemporal');
-    btn.innerHTML = `<i class="bi bi-check-circle-fill"></i> ACTUALIZAR CAMBIOS EN LISTA`;
+    btn.innerHTML = `<i class="bi bi-check-circle-fill"></i> ACTUALIZAR EN LISTA`;
     btn.classList.replace('btn-primary', 'btn-warning');
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -159,22 +234,16 @@ function renderizarLista() {
 
     metodosPagoArray.forEach((m, index) => {
         const badgeClass = getBadgeClass(m.entidad);
-        let imgSrc = IMG_DEFAULT;
-
-        if (m.file) {
-            imgSrc = URL.createObjectURL(m.file);
-        } else if (m.url_actual) {
-            imgSrc = m.url_actual;
-        }
+        const imgSrc = m.file ? URL.createObjectURL(m.file) : (m.url_actual || IMG_DEFAULT);
 
         lista.innerHTML += `
             <div class="col-12 col-md-6 animate__animated animate__fadeIn">
-                <div class="metodo-card p-3 shadow-sm d-flex align-items-center justify-content-between">
+                <div class="metodo-card p-3 shadow-sm d-flex align-items-center justify-content-between border rounded mb-2 bg-white">
                     <div class="d-flex align-items-center gap-3">
                         <img src="${imgSrc}" class="rounded border" style="width:55px; height:55px; object-fit:cover;">
                         <div>
                             <span class="bank-badge ${badgeClass} mb-1">${m.entidad}</span>
-                            <h6 class="m-0 fw-bold">${m.titular}</h6>
+                            <h6 class="m-0 fw-bold text-dark">${m.titular}</h6>
                             <small class="text-muted d-block">${m.numero}</small>
                         </div>
                     </div>
@@ -204,11 +273,18 @@ function eliminarFila(index) {
     metodosPagoArray.splice(index, 1);
     if (editIndex === index) resetearFormulario();
     renderizarLista();
+    showMessage("Método eliminado de la lista", true);
 }
 
 async function guardarCambiosPagos() {
     const btn = document.getElementById('btnGuardarPagos');
     const originalContent = btn.innerHTML;
+    
+    if (metodosPagoArray.length === 0) {
+        showMessage("No hay métodos para guardar", true);
+        return;
+    }
+
     btn.disabled = true;
     btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> SINCRONIZANDO...`;
 
@@ -231,20 +307,24 @@ async function guardarCambiosPagos() {
     });
 
     try {
-        const response = await fetch("/zona_pagos_page", {
+        const response = await fetch("/facturacion_page", {
             method: "POST",
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
             body: formData
         });
+
+        if (!response.ok) throw new Error("Error en la comunicación con el servidor");
+
         const result = await response.json();
 
         if (result.ok) {
-            mostrarToastApp("¡Cambios guardados globalmente!", "success");
+            showMessage("¡Cambios aplicados correctamente!");
             setTimeout(() => location.reload(), 1500);
         } else {
-            throw new Error(result.error);
+            throw new Error(result.error || "No se pudieron guardar los cambios");
         }
     } catch (error) {
-        mostrarToastApp("Error: " + error.message, "danger");
+        showMessage(error.message, true);
         btn.disabled = false;
         btn.innerHTML = originalContent;
     }
@@ -274,28 +354,10 @@ function getBadgeClass(entidad) {
     return classes[entidad] || 'bg-secondary text-white';
 }
 
-function mostrarToastApp(msj, tipo) {
-    const container = document.getElementById('toastContainer');
-    if (!container) return;
-    const id = Date.now();
-    const html = `
-        <div id="toast-${id}" class="alert alert-${tipo} shadow-lg border-0 mb-2 animate__animated animate__fadeInRight" style="min-width:280px;">
-            <div class="d-flex align-items-center">
-                <i class="bi bi-info-circle-fill me-2 fs-5"></i>
-                <span class="small fw-bold">${msj}</span>
-            </div>
-        </div>`;
-    container.insertAdjacentHTML('beforeend', html);
-    setTimeout(() => {
-        const t = document.getElementById(`toast-${id}`);
-        if (t) t.remove();
-    }, 4000);
-}
-
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/static/js/workers/service-worker-zona_pagos.js')
-        .then(() => { console.log('SW OK'); })
-        .catch(() => { console.log('SW Error'); });
+        .then(() => console.log('SW OK'))
+        .catch(() => console.log('SW Error'));
     });
 }

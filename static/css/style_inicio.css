@@ -169,14 +169,9 @@ footer, .footer {
     background-color: #000;
     color: #fff;
     padding: 40px 0 20px 0;
-    border-top: 4px solid var(--primary-color);
-    flex-shrink: 0;
-    width: 100%;
+    border-top: 4px solid var(--primary);
 }
 
-footer .container-central, .footer .container-central {
-    padding: 0 1rem;
-}
 @media (max-width: 768px) {
     .carousel-item { height: 350px; }
     .carousel-title-animate { font-size: 1.4rem; }

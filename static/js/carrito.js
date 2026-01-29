@@ -400,13 +400,21 @@ async function cargarCarrito() {
 
         let totalGeneral = 0;
         const tabla = document.createElement("table");
-        tabla.className = "table align-middle mb-0";
+        tabla.className = "custom-table-carrito align-middle mb-0";
         tabla.innerHTML = `
-            <thead><tr><th class="ps-4">Producto</th><th>Cantidad</th><th>Unitario</th><th>Subtotal</th><th class="text-center">Acción</th></tr></thead>
+            <thead>
+                <tr>
+                    <th class="col-img ps-3"></th>
+                    <th class="col-prod">Producto</th>
+                    <th class="col-cant">Cant.</th>
+                    <th class="col-sub">Subtotal</th>
+                    <th class="col-del text-center"></th>
+                </tr>
+            </thead>
             <tbody></tbody>
             <tfoot class="table-light">
                 <tr>
-                    <td colspan="3" class="text-end fw-bold py-3">Total del Pedido:</td>
+                    <td colspan="3" class="text-end fw-bold py-3">Total:</td>
                     <td colspan="2" class="ps-3 py-3 fw-bold fs-5 text-primary" id="totalCarritoFinal"></td>
                 </tr>
             </tfoot>`;
@@ -418,48 +426,44 @@ async function cargarCarrito() {
             const sub = Number(item.precio_unitario) * Number(item.cantidad);
             totalGeneral += sub;
             const tr = document.createElement("tr");
-            tr.style.transition = "all 0.4s ease";
+            tr.className = "cart-item-row";
             
             const imgPath = item.imagen || item.imagen_url;
             const fotoHtml = imgPath 
-                ? `<img src="${imgPath}" class="img-preview me-3" width="45" height="45" style="object-fit:cover; border-radius: 8px;" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'me-3 bg-light d-flex align-items-center justify-content-center\' style=\'width:45px; height:45px; border-radius:8px;\'><i class=\'bi bi-box\'></i></div>';">`
-                : `<div class="me-3 bg-light d-flex align-items-center justify-content-center" style="width:45px; height:45px; border-radius:8px;"><i class="bi bi-box"></i></div>`;
+                ? `<img src="${imgPath}" class="img-preview" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'img-placeholder\'><i class=\'bi bi-box\'></i></div>';">`
+                : `<div class="img-placeholder"><i class="bi bi-box"></i></div>`;
 
             tr.innerHTML = `
-                <td class="ps-4 py-3">
-                    <div class="d-flex align-items-center">
-                        ${fotoHtml}
-                        <strong>${item.nombre_producto}</strong>
-                    </div>
-                </td>
-                <td><span class="badge bg-light text-dark border">x${item.cantidad}</span></td>
-                <td>${Number(item.precio_unitario).toLocaleString('es-CO',{style:'currency',currency:'COP'})}</td>
-                <td>${sub.toLocaleString('es-CO',{style:'currency',currency:'COP'})}</td>
-                <td class="text-center"><button class="btn btn-sm btn-outline-danger btn-quitar"><i class="bi bi-trash"></i></button></td>`;
+                <td class="ps-3 py-3 col-img">${fotoHtml}</td>
+                <td class="col-prod"><strong>${item.nombre_producto}</strong></td>
+                <td class="col-cant"><span class="badge-qty">${item.cantidad}</span></td>
+                <td class="col-sub">${sub.toLocaleString('es-CO',{style:'currency',currency:'COP', maximumFractionDigits: 0})}</td>
+                <td class="col-del text-center">
+                    <button class="btn btn-sm btn-outline-danger btn-quitar border-0"><i class="bi bi-trash"></i></button>
+                </td>`;
             
             tr.querySelector(".btn-quitar").onclick = async (e) => {
                 const btnQuitar = e.currentTarget;
                 btnQuitar.disabled = true;
-                btnQuitar.innerHTML = `<span class="spinner-border spinner-border-sm"></span>`;
+                
+                tr.classList.add("removing");
 
                 const r = await fetch(`/carrito_quitar/${item.id_carrito}`, { method: "DELETE" });
                 if (r.ok) { 
-                    tr.style.opacity = "0";
-                    tr.style.transform = "translateX(20px)";
                     setTimeout(() => {
                         cargarCarrito();
                         showMessage("Producto eliminado");
                     }, 400);
                 } else {
+                    tr.classList.remove("removing");
                     btnQuitar.disabled = false;
-                    btnQuitar.innerHTML = `<i class="bi bi-trash"></i>`;
                 }
             };
             tbody.appendChild(tr);
         });
 
         const totalEl = document.getElementById("totalCarritoFinal");
-        if (totalEl) totalEl.textContent = totalGeneral.toLocaleString('es-CO',{style:'currency',currency:'COP'});
+        if (totalEl) totalEl.textContent = totalGeneral.toLocaleString('es-CO',{style:'currency',currency:'COP', maximumFractionDigits: 0});
         if (btn) btn.style.display = "inline-block";
 
     } catch(e) { console.error(e); }

@@ -1,3 +1,7 @@
+:root {
+    --primary-color: #d35400;
+}
+
 html, body {
     height: 100%;
     margin: 0;
@@ -62,28 +66,9 @@ h2 {
     background: linear-gradient(135deg, #fff5f5 0%, #ffebee 100%);
 }
 
-@keyframes highlightNew {
-    0% { background-color: #fff3cd; transform: scale(1); }
-    50% { background-color: #ffeeba; transform: scale(1.02); }
-    100% { background-color: inherit; transform: scale(1); }
-}
-
-.animacion-nuevo {
-    animation: highlightNew 2s ease-in-out infinite alternate;
-}
-
 .pedido-card:hover {
     transform: translateY(-5px);
     box-shadow: 0 12px 30px rgba(0,0,0,0.15);
-}
-
-.pedido-card.seleccion {
-    border: 3px solid #dc3545;
-    box-shadow: 0 0 15px rgba(220, 53, 69, 0.6);
-}
-
-.pedido-card.fijado {
-    border: 2px solid #0d6efd;
 }
 
 .card-collapsed .card-body {
@@ -91,62 +76,24 @@ h2 {
     opacity: 0;
 }
 
-.card-header .toggle-detalle {
-    cursor: pointer;
-    transition: transform 0.3s ease, color 0.3s ease;
-}
-
-.pedido-card:not(.card-collapsed) .card-header .toggle-detalle {
-    transform: rotate(180deg);
-}
-
-.card-header .toggle-detalle:hover {
-    color: #d35400;
-    transform: rotate(180deg) scale(1.2);
-}
-
-.card-collapsed .card-header .toggle-detalle:hover {
-    transform: scale(1.2);
-}
-
-.btn-fijar {
-    transition: all 0.3s ease;
-}
-
-.btn-fijar:hover {
-    transform: scale(1.2);
-}
-
-.estado-select, .btn {
-    transition: all 0.3s ease;
-}
-
-.estado-select:hover {
-    transform: scale(1.02);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
-}
-
-.btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+.table-responsive-container {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 .table {
     border-radius: 10px;
     overflow: hidden;
     box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    min-width: 400px;
 }
 
-.table th, .table td {
-    vertical-align: middle !important;
-}
-
-.toggle-pago-item {
-    transition: all 0.3s ease;
-}
-
-.toggle-pago-item:hover {
-    transform: scale(1.2);
+@media (max-width: 576px) {
+    .table {
+        min-width: 100%;
+        font-size: 0.85rem;
+    }
 }
 
 #toastContainer {
@@ -178,70 +125,21 @@ h2 {
 }
 
 @keyframes toastSlideIn {
-    from { 
-        opacity: 0; 
-        transform: translateX(100%); 
-    }
-    to { 
-        opacity: 1; 
-        transform: translateX(0); 
-    }
-}
-
-.btn-close-toast {
-    transition: transform 0.2s ease;
-    cursor: pointer;
-}
-
-.btn-close-toast:hover {
-    transform: scale(1.2);
+    from { opacity: 0; transform: translateX(100%); }
+    to { opacity: 1; transform: translateX(0); }
 }
 
 footer, .footer {
-    flex-shrink: 0;
     background-color: #000;
     color: #fff;
     padding: 40px 0 20px 0;
-    margin-top: auto;
-    border-top: 4px solid var(--primary-color, #d35400);
+    border-top: 4px solid var(--primary-color);
+    flex-shrink: 0;
+    width: 100%;
 }
 
-.footer-bottom {
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    padding-top: 15px;
-    font-size: 0.85rem;
-    color: rgba(255, 255, 255, 0.6);
-}
-
-.footer h5 {
-    color: var(--primary-color, #d35400);
-    font-weight: 700;
-    margin-bottom: 20px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-.footer a {
-    color: rgba(255, 255, 255, 0.8);
-    text-decoration: none;
-    transition: all 0.3s ease;
-}
-
-.footer a:hover {
-    color: var(--primary-color, #d35400);
-}
-
-.icono {
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.icono:hover {
-    transform: scale(1.1);
-}
-
-.btn-select-delete:hover {
-    color: #dc3545 !important;
+footer .container-central, .footer .container-central {
+    padding: 0 1rem;
 }
 
 .form-control, .form-select {
@@ -253,51 +151,4 @@ footer, .footer {
 .form-control:focus, .form-select:focus {
     border-color: #e67e22;
     box-shadow: 0 0 0 0.2rem rgba(230, 126, 34, 0.25);
-}
-
-.input-group-text {
-    background-color: #f8f9fa;
-    border: 2px solid #e0e0e0;
-}
-
-.badge {
-    padding: 0.4rem 0.8rem;
-    border-radius: 20px;
-    font-weight: 600;
-}
-
-@media (max-width: 768px) {
-    .card-title-marketing h3 {
-        font-size: 1.5rem;
-    }
-
-    .pedido-card {
-        margin-bottom: 1.5rem;
-    }
-
-    #toastContainer {
-        width: 280px;
-        right: 10px;
-    }
-
-    .btn {
-        padding: 0.5rem 1rem;
-        font-size: 0.9rem;
-    }
-}
-
-@media (max-width: 576px) {
-    .card-title-marketing {
-        padding: 1rem;
-    }
-
-    .pedido-card {
-        border-radius: 12px;
-    }
-
-    .table {
-        font-size: 0.85rem;
-        display: block;
-        overflow-x: auto;
-    }
 }

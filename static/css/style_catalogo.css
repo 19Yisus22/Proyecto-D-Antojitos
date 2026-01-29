@@ -212,6 +212,42 @@ body {
     transform: scale(1.1) translateY(-5px);
 }
 
+.btn-favorito-floating {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    z-index: 10;
+    border: none;
+    background: white;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+    cursor: pointer;
+    transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.btn-favorito-floating:hover {
+    transform: scale(1.15);
+}
+
+.btn-favorito-floating i {
+    transition: color 0.3s ease;
+}
+
+@keyframes heartBeat {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.3); }
+    100% { transform: scale(1); }
+}
+
+.bi-heart-fill {
+    animation: heartBeat 0.3s ease-out;
+}
+
 footer {
     background: #000;
     color: #fff;

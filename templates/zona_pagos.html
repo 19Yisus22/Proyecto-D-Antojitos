@@ -24,7 +24,7 @@
             <input type="hidden" id="metodos_iniciales_data" value='{{ metodos | tojson | safe }}'>
 
             <div class="card-title-marketing mb-4 text-center">
-                <h3 class="display-6 fw-bold m-0"><i class="bi bi-currency-exchange fs-2 text-white"></i> Gestionar Facturación</h3>
+                <h3 class="display-6 fw-bold m-0"><i class="bi bi-currency-exchange fs-2 text-white"></i> Gestionar Canales de Pago</h3>
                 <p class="text-white-50 mb-0">Configura las cuentas bancarias para realizar transferencias a tus bancos</p>
             </div>
 
@@ -32,7 +32,7 @@
                 <div class="card-body p-4">
                     <div class="d-flex align-items-center gap-2 mb-4">
                         <i class="bi bi-plus-circle-fill fs-4 text-primary"></i>
-                        <h4 class="m-0 fw-bold">Vincular Nueva Cuenta</h4>
+                        <h4 class="m-0 fw-bold">Agregar Nuevo Canal de Pago</h4>
                     </div>
                     
                     <div class="row g-4">
@@ -66,23 +66,25 @@
                             <input type="text" id="numeroCuenta" class="form-control mb-3" placeholder="Ej: 3101234567">
                             
                             <label class="form-label fw-bold small text-uppercase text-muted">Nombre del Titular</label>
-                            <input type="text" id="titularCuenta" class="form-control" placeholder="Ej: Juan Pérez">
+                            <input type="text" id="titularCuenta" class="form-control" placeholder="Ingrese nombre">
                         </div>
-
+                        
                         <div class="col-12">
                             <button id="btnAgregarTemporal" class="btn btn-primary w-100 py-3 shadow-sm">
-                                <i class="bi bi-node-plus-fill me-2"></i>AGREGAR A LA LISTA TEMPORAL
+                                <i class="bi bi-node-plus-fill me-2"></i>Agregar a Lista
                             </button>
                         </div>
                     </div>
                 </div>
             </div>
-
             <div class="card">
                 <div class="card-body p-4">
                     <div class="d-flex align-items-center gap-2 mb-4">
                         <i class="bi bi-credit-card-2-front fs-4 text-secondary"></i>
-                        <h4 class="m-0 fw-bold">Métodos a Guardar</h4>
+                        <h4 class="m-0 fw-bold">Canales de Pago a Guardar</h4>
+                    </div>
+                    <div class="alert alert-info mb-3" role="alert">
+                        <p class="bi bi-info-circle-fill me-2"> Los canales agregados a la lista (Canales Pagos a Guardar) es temporal, debe presionar el botón (Guardar Canales de Pago) para que se reflejen los cambios.</p>
                     </div>
                     <div id="listaMetodosPago" class="row g-3">
                         </div>
@@ -91,18 +93,18 @@
 
             <div class="sticky-bottom p-3 rounded-top-4 mb-5 mx-2">
                 <button id="btnGuardarPagos" class="btn btn-success btn-lg w-100 shadow">
-                    <i class="bi bi-cloud-upload me-2"></i>GUARDAR EN BASE DE DATOS
+                    <i class="bi bi-cloud-upload me-2"></i>Guardar Canales de Pago
                 </button>
             </div>
 
             <div class="mb-5 pb-5">
                 <div class="text-center mb-4">
-                    <span class="badge bg-secondary text-uppercase px-3 py-2">Vista Previa en Factura</span>
+                    <span class="badge bg-secondary text-uppercase px-3 py-2">Vista Previa de los Métodos</span>
                 </div>
                 <div id="facturaLayout" class="factura-mockup p-4 mx-auto shadow-sm" style="max-width: 500px;">
                     <div class="text-center mb-3">
-                        <h6 class="fw-bold mb-1">D'ANTOJITOS 2026</h6>
-                        <p class="small text-muted mb-0">Instrucciones de Pago por Transferencia</p>
+                        <h6 class="fw-bold mb-1">D'Antojitos© 2025</h6>
+                        <p class="small text-muted mb-0">Canales de Pago</p>
                     </div>
                     <hr>
                     <div id="previewContenedorFinal" class="row g-2">

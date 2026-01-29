@@ -108,26 +108,19 @@ async function iniciarModuloPedidos() {
         btnPDF.addEventListener("click", generarReporteConfigurado);
     }
 
-    const btnEliminar = document.getElementById("eliminarSeleccionados");
-    if (btnEliminar) {
-        btnEliminar.onclick = () => {
-            const sel = document.querySelectorAll(".pedido-card.seleccion");
-            if (sel.length === 0) return showMessage("Seleccione pedidos", true);
-            showConfirmToast(`¿Eliminar ${sel.length} pedidos?`, async () => {
-                for (const c of sel) {
-                    await fetch(`/eliminar_pedido/${c.id.replace("pedido-", "")}`, { method: "DELETE" });
-                }
-                showMessage("Eliminados correctamente");
-                await cargarPedidos();
-            });
-        };
-    }
+    const inputsFiltro = [
+        "inputBusquedaNombre", 
+        "inputBusquedaCedula", 
+        "inputNumeroFactura", 
+        "selectAnio", 
+        "filtroEstado"
+    ];
 
-    const inputsFiltro = ["inputBusquedaNombre", "inputBusquedaCedula", "inputNumeroFactura", "selectAnio", "filtroEstado"];
     inputsFiltro.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
-            el.addEventListener(id.includes("select") || id.includes("filtro") ? "change" : "input", () => {
+            const evento = (id.includes("select") || id.includes("filtro")) ? "change" : "input";
+            el.addEventListener(evento, () => {
                 paginaActual = 1;
                 aplicarFiltros();
             });
@@ -214,18 +207,10 @@ async function cargarPedidos(isAutoRefresh = false) {
     try {
         const res = await fetch("/obtener_pedidos");
         const pedidos = await res.json();
-        
         if (!Array.isArray(pedidos)) return;
 
         pedidosDatosRaw = pedidos;
-        const idsPedidosActuales = pedidos.map(p => parseInt(p.id_pedido));
-        const maxIdActual = idsPedidosActuales.length > 0 ? Math.max(...idsPedidosActuales) : 0;
         
-        if (maxIdActual > 0) {
-            ultimoIdPedidoNotificado = maxIdActual;
-            localStorage.setItem("ultimoIdPedidoNotificado", ultimoIdPedidoNotificado);
-        }
-
         pedidosGlobal = pedidos.map(pedido => {
             const facturaFormateada = generarNumeroFactura(pedido.id_pedido, pedido.fecha_pedido);
             const card = document.createElement("div");
@@ -233,117 +218,88 @@ async function cargarPedidos(isAutoRefresh = false) {
             const esFijado = pedidosFijados.includes(idPedidoStr);
             const user = pedido.usuarios || {};
             
-            let itemsHTML = (pedido.pedido_detalle || []).map((item, idx) => {
+            let totalPendientePedido = 0;
+
+            const itemsRowsHTML = (pedido.pedido_detalle || []).map((item, idx) => {
                 const itemId = `${pedido.id_pedido}-${idx}`;
                 let pagadoItem = estadosPagoGuardados[itemId] !== undefined ? estadosPagoGuardados[itemId] : (item.pagado !== undefined ? item.pagado : pedido.pagado);
-                return { 
-                    html: `<tr><td>${item.gestion_productos?.nombre || item.nombre_producto || 'Producto'}</td><td>${item.cantidad}</td><td>${item.subtotal.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</td><td><i class="bi ${pagadoItem ? 'bi-check-circle text-success' : 'bi-x-circle text-danger'} fs-4 toggle-pago-item" style="cursor:pointer" data-item-id="${itemId}" data-pagado="${pagadoItem}"></i></td></tr>`, 
-                    pagado: pagadoItem 
-                };
-            });
+                
+                const subtotal = Number(item.subtotal || 0);
+                if (!pagadoItem) {
+                    totalPendientePedido += subtotal;
+                }
 
-            const estadosPagoArray = (pedido.pedido_detalle || []).map((_, idx) => {
+                return `<tr>
+                    <td class="text-start">${item.gestion_productos?.nombre || item.nombre_producto || 'Producto'}</td>
+                    <td>${item.cantidad}</td>
+                    <td>${subtotal.toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })}</td>
+                    <td><i class="bi ${pagadoItem ? 'bi-check-circle text-success' : 'bi-x-circle text-danger'} fs-4 toggle-pago-item" style="cursor:pointer" data-item-id="${itemId}" data-pagado="${pagadoItem}"></i></td>
+                </tr>`;
+            }).join("");
+
+            const todosPagos = (pedido.pedido_detalle || []).every((_, idx) => {
                 const itemId = `${pedido.id_pedido}-${idx}`;
                 return estadosPagoGuardados[itemId] !== undefined ? estadosPagoGuardados[itemId] : (pedido.pedido_detalle[idx].pagado !== undefined ? pedido.pedido_detalle[idx].pagado : pedido.pagado);
             });
 
-            const todosPagos = estadosPagoArray.every(p => p === true);
             const esTerminado = pedido.estado === 'Entregado' && todosPagos;
             const esAnulado = pedido.estado === 'Cancelado';
             const bloqueado = esTerminado || esAnulado;
 
             let estadoClase = esAnulado ? "pedido-anulado" : (esTerminado ? "pedido-finalizado" : "pedido-activo");
 
-            card.className = `pedido-card card-collapsed col-12 mb-3 p-2 shadow-sm ${estadoClase} ${esFijado ? 'fijado border-primary' : ''}`;
-            card.dataset.id_real = idPedidoStr;
+            card.className = `pedido-card card-collapsed col-12 mb-3 p-1 shadow-sm ${estadoClase} ${esFijado ? 'fijado border-primary' : ''}`;
             card.id = `pedido-${pedido.id_pedido}`;
 
             const fechaStr = pedido.fecha_pedido ? new Date(pedido.fecha_pedido).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' }) : '---';
-            let textoPago = todosPagos ? 'Pagado' : `Pendiente (${estadosPagoArray.filter(p => !p).length})`;
 
             card.innerHTML = `
                 <div class="card border-0 bg-transparent">
-                    <div class="card-header d-flex justify-content-between align-items-center bg-transparent border-0">
+                    <div class="card-header d-flex justify-content-between align-items-center bg-transparent border-0 py-2">
                         <div class="d-flex align-items-center gap-2">
                             <i class="bi ${esFijado ? 'bi-pin-angle-fill text-primary' : 'bi-pin-angle'} fs-5 btn-fijar" style="cursor:pointer"></i>
-                            <img src="${user.imagen_url || '/static/uploads/default.png'}" class="rounded-circle" style="width:40px;height:40px;object-fit:cover;">
-                            <div><strong>${facturaFormateada}</strong><br><small class="status-info">Estado: ${pedido.estado} - ${textoPago} | ${fechaStr}</small></div>
+                            <img src="${user.imagen_url || '/static/uploads/default.png'}" class="rounded-circle border" style="width:38px;height:38px;object-fit:cover;">
+                            <div class="lh-1">
+                                <strong class="d-block" style="font-size:0.9rem">${facturaFormateada}</strong>
+                                <small class="status-info text-muted" style="font-size:0.75rem">${pedido.estado} | ${fechaStr}</small>
+                            </div>
                         </div>
                         <div class="d-flex gap-2">
                             <i class="bi bi-chevron-down icono fs-4 toggle-detalle"></i>
                             <i class="bi bi-trash icono text-danger fs-4 btn-eliminar-individual" style="cursor:pointer"></i>
-                            <i class="bi bi-check-square icono text-primary fs-4 btn-select-delete" style="cursor:pointer"></i>
                         </div>
                     </div>
-                    <div class="card-body">
-                        <div class="row mb-3">
-                            <div class="col-md-6 mb-3 mb-md-0">
-                                <strong>Cliente: ${user.nombre || 'Sin nombre'}</strong><br>
-                                <small>Cédula: ${user.cedula || 'N/A'}</small>
-                            </div>
+                    <div class="card-body pt-0">
+                        <div class="mb-2 border-top pt-2">
+                            <small class="d-block"><strong>Cliente:</strong> ${user.nombre || 'Sin nombre'}</small>
                         </div>
-                        <table class="table table-sm text-center">
-                            <thead class="table-light"><tr><th>Prod</th><th>Cant</th><th>Sub</th><th>Pago</th></tr></thead>
-                            <tbody>${itemsHTML.map(i => i.html).join("")}</tbody>
-                        </table>
-                        <div class="d-flex gap-2 align-items-center mt-3">
+                        <div class="table-responsive-container">
+                            <table class="table table-sm text-center mb-0">
+                                <thead><tr><th class="text-start">Productos</th><th>Cantidad</th><th>Subtotal</th><th>Pago?</th></tr></thead>
+                                <tbody>${itemsRowsHTML}</tbody>
+                                <tfoot class="table-light">
+                                    <tr>
+                                        <td colspan="2" class="text-end fw-bold">Total Pendiente:</td>
+                                        <td colspan="2" class="text-start fw-bold text-danger ps-3">
+                                            ${totalPendientePedido.toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })}
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                        <div class="d-flex gap-2 mt-3">
                             <select class="form-select form-select-sm estado-select" ${bloqueado ? 'disabled' : ''}>
                                 <option value="Pendiente" ${pedido.estado === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
                                 <option value="Enviado" ${pedido.estado === 'Enviado' ? 'selected' : ''}>Enviado</option>
                                 <option value="Entregado" ${pedido.estado === 'Entregado' ? 'selected' : ''}>Finalizado</option>
                                 <option value="Cancelado" ${pedido.estado === 'Cancelado' ? 'selected' : ''}>Anulado</option>
                             </select>
-                            <button class="btn btn-primary btn-sm actualizar-btn" ${bloqueado ? 'disabled' : ''}>Actualizar</button>
+                            <button class="btn btn-primary btn-sm actualizar-btn px-3" ${bloqueado ? 'disabled' : ''}>Actualizar</button>
                         </div>
                     </div>
                 </div>`;
 
-            card.querySelector(".btn-eliminar-individual").onclick = async () => {
-                try {
-                    const res = await fetch("/eliminar_pedidos", {
-                        method: "DELETE",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ ids: [idPedidoStr] })
-                    });
-                    const data = await res.json();
-                    if (res.ok && data.success) {
-                        showMessage("Pedido eliminado");
-                        await cargarPedidos();
-                    } else {
-                        showMessage(data.message || "Error", true);
-                    }
-                } catch (e) {
-                    showMessage("Error de conexión", true);
-                }
-            };
-
-            card.querySelector(".btn-fijar").onclick = () => {
-                if (pedidosFijados.includes(idPedidoStr)) {
-                    pedidosFijados = pedidosFijados.filter(id => id !== idPedidoStr);
-                } else {
-                    pedidosFijados.push(idPedidoStr);
-                }
-                localStorage.setItem("pedidosFijados", JSON.stringify(pedidosFijados));
-                aplicarFiltros();
-            };
-
-            card.querySelector(".toggle-detalle").onclick = () => card.classList.toggle("card-collapsed");
-            card.querySelector(".btn-select-delete").onclick = () => card.classList.toggle("seleccion");
-            
-            card.querySelector(".actualizar-btn").onclick = async () => {
-                const nuevo = card.querySelector(".estado-select").value;
-                const r = await fetch(`/actualizar_estado/${pedido.id_pedido}`, {
-                    method: "PUT",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ estado: nuevo })
-                });
-                if (r.ok) {
-                    const resData = await r.json();
-                    showMessage(`Estado: ${nuevo}`);
-                    await cargarPedidos();
-                }
-            };
-
+            // Configurar eventos de iconos de pago
             card.querySelectorAll(".toggle-pago-item").forEach(icon => {
                 if (bloqueado) return;
                 icon.onclick = async () => {
@@ -362,13 +318,28 @@ async function cargarPedidos(isAutoRefresh = false) {
                     });
 
                     if (res.ok) {
-                        icon.dataset.pagado = val;
-                        icon.className = `bi ${val ? 'bi-check-circle text-success' : 'bi-x-circle text-danger'} fs-4 toggle-pago-item`;
                         await cargarPedidos();
-                        showMessage("Pago actualizado");
+                        showMessage("Cobro actualizado");
                     }
                 };
             });
+
+            // Resto de eventos (fijar, eliminar, toggle)
+            card.querySelector(".btn-fijar").onclick = () => {
+                pedidosFijados = pedidosFijados.includes(idPedidoStr) ? pedidosFijados.filter(id => id !== idPedidoStr) : [...pedidosFijados, idPedidoStr];
+                localStorage.setItem("pedidosFijados", JSON.stringify(pedidosFijados));
+                aplicarFiltros();
+            };
+            card.querySelector(".btn-eliminar-individual").onclick = async () => {
+                const r = await fetch("/eliminar_pedidos", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: [idPedidoStr] }) });
+                if (r.ok) { showMessage("Pedido eliminado"); await cargarPedidos(); }
+            };
+            card.querySelector(".toggle-detalle").onclick = () => card.classList.toggle("card-collapsed");
+            card.querySelector(".actualizar-btn").onclick = async () => {
+                const nuevo = card.querySelector(".estado-select").value;
+                const r = await fetch(`/actualizar_estado/${pedido.id_pedido}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: nuevo }) });
+                if (r.ok) { showMessage(`Estado: ${nuevo}`); await cargarPedidos(); }
+            };
 
             return card;
         });
@@ -624,7 +595,6 @@ document.addEventListener('change', async (e) => {
         }
     }
 });
-
 
 const inputsFiltro = ["inputBusquedaNombre", "inputBusquedaCedula", "inputNumeroFactura", "selectAnio", "filtroEstado"];
 inputsFiltro.forEach(id => {

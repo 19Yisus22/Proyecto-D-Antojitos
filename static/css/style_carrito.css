@@ -26,7 +26,6 @@ body {
     background-color: #f4f4f4;
     font-family: 'Segoe UI', system-ui, sans-serif;
     width: 100%;
-    overflow-x: hidden;
 }
 
 .main-wrapper {
@@ -48,6 +47,7 @@ body {
     border-radius: 50px;
     font-weight: 600;
     transition: all 0.3s ease;
+    padding: 10px 25px;
 }
 
 .btn-confirmar:hover {
@@ -58,6 +58,9 @@ body {
 
 .custom-table-carrito {
     width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: auto;
 }
 
 .custom-table-carrito thead {
@@ -65,11 +68,29 @@ body {
     color: white;
 }
 
+.custom-table-carrito th {
+    padding: 12px 8px;
+    text-align: center !important;
+    vertical-align: middle;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+}
+
+.custom-table-carrito td {
+    padding: 12px 8px;
+    vertical-align: middle;
+    text-align: center;
+    border-bottom: 1px solid var(--border-invoice);
+}
+
 .cart-item-row {
     transition: all 0.4s ease;
+    background: white;
 }
 
 .cart-item-row.removing {
+    animation: shake 0.4s ease-in-out;
     opacity: 0;
     transform: translateX(20px);
 }
@@ -79,6 +100,7 @@ body {
     object-fit: cover;
     width: 45px;
     height: 45px;
+    margin-right: 12px;
 }
 
 .img-placeholder {
@@ -89,6 +111,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+    margin-right: 12px;
 }
 
 .badge-qty {
@@ -108,14 +131,7 @@ body {
     min-width: 320px;
     box-shadow: var(--shadow);
     margin-bottom: 12px;
-    opacity: 1;
-    transition: opacity 0.4s ease, transform 0.4s ease;
     animation: slideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-}
-
-.custom-toast.hide {
-    opacity: 0;
-    transform: translateX(30px);
 }
 
 .toast-confirm { border-left: 5px solid var(--warning-bg); }
@@ -142,80 +158,11 @@ body {
     border-bottom: 1px dashed #dee2e6;
 }
 
-.factura-body {
-    padding: 1.2rem;
-    background: #fff;
-}
-
-.qr-container img {
-    transition: transform 0.3s ease;
-}
-
-.qr-container img:hover {
-    transform: scale(1.05);
-}
-
-.btn-copy-sm {
-    padding: 2px 6px;
-    font-size: 0.75rem;
-    color: var(--primary);
-    background: #fff4ed;
-    border: 1px solid #ffd8bf;
-    border-radius: 4px;
-    transition: all 0.2s ease;
-}
-
-.btn-copy-sm:hover {
-    background: var(--primary);
-    color: white;
-}
-
-.factura-footer {
-    padding: 1rem 1.2rem;
-    background: var(--bg-invoice);
-    border-top: 1px solid #eee;
-}
-
-.item-row {
-    display: grid;
-    grid-template-columns: 1fr auto auto;
-    gap: 10px;
-    padding: 6px 0;
-    border-bottom: 1px solid #f8f9fa;
-    font-size: 0.9rem;
-}
-
-.badge-status {
-    padding: 5px 12px;
-    border-radius: 50px;
-    font-size: 0.75rem;
-    font-weight: 700;
-    text-transform: uppercase;
-}
-
-.bg-primary { background-color: var(--info-bg) !important; color: white; }
-.bg-success { background-color: var(--success-bg) !important; color: white; }
-.bg-danger { background-color: var(--danger-bg) !important; color: white; }
-.bg-info { background-color: var(--info-bg) !important; color: white; }
-
-#contadorCarritoBadge {
-    display: none;
-    position: absolute;
-    top: -5px;
-    right: -5px;
-}
-
-#contadorCarritoBadge.active {
-    display: flex;
-}
-
-.badge-bounce {
-    animation: bounce 0.4s ease;
-}
-
-@keyframes bounce {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.3); }
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    50% { transform: translateX(5px); }
+    75% { transform: translateX(-5px); }
 }
 
 @keyframes slideIn {
@@ -223,39 +170,45 @@ body {
     to { opacity: 1; transform: translateX(0); }
 }
 
-.fade-in-item {
-    animation: fadeIn 0.5s ease both;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
 footer, .footer {
     background-color: #000;
     color: #fff;
     padding: 40px 0 20px 0;
-    border-top: 4px solid var(--primary-color);
+    border-top: 4px solid var(--primary);
     flex-shrink: 0;
     width: 100%;
 }
 
-footer .container-central, .footer .container-central {
-    padding: 0 1rem;
-}
-
 @media (max-width: 768px) {
     .custom-table-carrito {
-        display: block;
-        overflow-x: auto;
-        white-space: nowrap;
+        display: table;
+        table-layout: fixed;
+        font-size: 0.8rem;
     }
+
+    .custom-table-carrito th {
+        padding: 8px 4px;
+        font-size: 0.75rem;
+    }
+
+    .custom-table-carrito td {
+        padding: 8px 4px;
+    }
+
+    .img-preview, .img-placeholder {
+        width: 35px;
+        height: 35px;
+        margin-right: 8px;
+    }
+
+    .col-img { width: 50px; }
+    .col-prod { width: auto; text-align: left !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .col-cant { width: 45px; }
+    .col-sub { width: 85px; }
+    .col-del { width: 40px; }
 
     .custom-toast {
         min-width: auto;
-        width: 90%;
-        margin-left: auto;
-        margin-right: auto;
+        width: 95%;
     }
 }

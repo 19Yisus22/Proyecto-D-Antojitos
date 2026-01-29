@@ -136,20 +136,6 @@ function mostrarToastActualizacion(imagen, titulo, descripcion, idUnico, isError
         productosNotificados.delete(idUnico);}, 7000);
 }
 
-function toggleFavorito(id) {
-    const idStr = id.toString();
-    const index = favoritos.indexOf(idStr);
-    if (index > -1) {
-        favoritos.splice(index, 1);
-        showMessage("Eliminado de favoritos");
-    } else {
-        favoritos.push(idStr);
-        showMessage("Añadido a favoritos");
-    }
-    localStorage.setItem('mis_favoritos_postres', JSON.stringify(favoritos));
-    renderProductos(searchInput.value);
-}
-
 async function sincronizarContadorCarrito() {
     try {
         const res = await fetch("/obtener_carrito");
@@ -241,6 +227,20 @@ function iniciarNotificacionesCintaPeriodicas() {
     }, 20000);
 }
 
+function toggleFavorito(id) {
+    const idStr = id.toString();
+    const index = favoritos.indexOf(idStr);
+    if (index > -1) {
+        favoritos.splice(index, 1);
+        showMessage("Eliminado de favoritos");
+    } else {
+        favoritos.push(idStr);
+        showMessage("Añadido a favoritos");
+    }
+    localStorage.setItem('mis_favoritos_postres', JSON.stringify(favoritos));
+    renderProductos(searchInput.value);
+}
+
 async function cargarProductos() {
     try {
         const res = await fetch("/obtener_catalogo");
@@ -255,22 +255,10 @@ async function cargarProductos() {
                 const viejo = productos.find(p => p.id_producto == nuevo.id_producto);
                 if (viejo) {
                     if (viejo.stock > 0 && nuevo.stock <= 0) {
-                        mostrarToastActualizacion(
-                            nuevo.imagen_url || '/static/uploads/logo.png', 
-                            "¡Agotado!", 
-                            `${nuevo.nombre} se ha terminado por ahora`, 
-                            `agotado-${nuevo.id_producto}`, 
-                            true
-                        );
+                        mostrarToastActualizacion(nuevo.imagen_url || '/static/uploads/logo.png', "¡Agotado!", `${nuevo.nombre} se ha terminado por ahora`, `agotado-${nuevo.id_producto}`, true);
                         huboCambios = true;
                     } else if (viejo.stock <= 0 && nuevo.stock > 0) {
-                        mostrarToastActualizacion(
-                            nuevo.imagen_url || '/static/uploads/logo.png', 
-                            "¡De Vuelta!", 
-                            `${nuevo.nombre} ya está disponible nuevamente`, 
-                            `disponible-${nuevo.id_producto}`,
-                            false
-                        );
+                        mostrarToastActualizacion(nuevo.imagen_url || '/static/uploads/logo.png', "¡De Vuelta!", `${nuevo.nombre} ya está disponible nuevamente`, `disponible-${nuevo.id_producto}`, false);
                         huboCambios = true;
                     } else if (viejo.stock !== nuevo.stock || viejo.precio !== nuevo.precio) {
                         huboCambios = true;
@@ -314,11 +302,11 @@ function renderProductos(filterText = '') {
             <div class="accordion border-0 shadow-sm" style="border-radius: 15px; overflow: hidden;">
                 <div class="accordion-item border-0">
                     <h2 class="accordion-header">
-                        <button class="accordion-button fw-bold text-dark collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFavoritosSec" style="background-color: #fff9f0;">
+                        <button class="accordion-button fw-bold text-dark" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFavoritosSec" style="background-color: #fff9f0;">
                             <i class="bi bi-heart-fill text-danger me-2"></i> TUS FAVORITOS (${listaFavoritos.length})
                         </button>
                     </h2>
-                    <div id="collapseFavoritosSec" class="accordion-collapse collapse">
+                    <div id="collapseFavoritosSec" class="accordion-collapse collapse show">
                         <div class="accordion-body px-0" style="background-color: #fffdfa;">
                             <div class="row g-4 px-3" id="contenedorInternoFavoritos"></div>
                         </div>
@@ -327,7 +315,7 @@ function renderProductos(filterText = '') {
             </div>`;
         catalogoContainer.appendChild(col);
         const inner = document.getElementById("contenedorInternoFavoritos");
-        listaFavoritos.forEach(p => inner.appendChild(crearCardProductoHTML(p)));
+        listaFavoritos.forEach(p => inner.appendChild(crearCardProductoHTML(p, "fav")));
     }
 
     if (disponibles.length > 0) {
@@ -341,7 +329,7 @@ function renderProductos(filterText = '') {
             <div class="row g-4 mt-1" id="gridDisponibles"></div>`;
         catalogoContainer.appendChild(headerDisp);
         const gridDisp = document.getElementById("gridDisponibles");
-        disponibles.forEach(p => gridDisp.appendChild(crearCardProductoHTML(p)));
+        disponibles.forEach(p => gridDisp.appendChild(crearCardProductoHTML(p, "disp")));
     }
 
     if (agotados.length > 0) {
@@ -355,7 +343,7 @@ function renderProductos(filterText = '') {
             <div class="row g-4 mt-1" id="gridAgotados"></div>`;
         catalogoContainer.appendChild(headerAgot);
         const gridAgot = document.getElementById("gridAgotados");
-        agotados.forEach(p => gridAgot.appendChild(crearCardProductoHTML(p)));
+        agotados.forEach(p => gridAgot.appendChild(crearCardProductoHTML(p, "agot")));
     }
 
     if (baseFiltrada.length === 0) {
@@ -364,16 +352,21 @@ function renderProductos(filterText = '') {
     agregarEventosProductos();
 }
 
-function crearCardProductoHTML(p) {
+function crearCardProductoHTML(p, prefix = "") {
     const col = document.createElement("div");
     col.className = `col-md-6 col-lg-4 mb-2 fade-in`;
     col.dataset.id = p.id_producto;
     const isAgotado = p.stock <= 0;
+    const esFav = favoritos.includes(p.id_producto.toString());
     const imgUrl = p.imagen_url || '/static/uploads/default.png';
+    const uniqueId = `${prefix}-${p.id_producto}`;
 
     col.innerHTML = `
         <div class="card h-100 product-card shadow-sm ${isAgotado ? 'producto-gris' : ''}" style="border-radius: 24px; border: 1px solid rgba(0,0,0,0.05); transition: all 0.3s ease;">
             <div class="img-wrapper position-relative overflow-hidden" style="height: 220px; border-radius: 24px 24px 0 0;">
+                <button class="btn-favorito-floating btn-fav-toggle" id="fav-btn-${uniqueId}" data-id="${p.id_producto}">
+                    <i class="bi ${esFav ? 'bi-heart-fill text-danger' : 'bi-heart text-muted'}" style="font-size: 1.2rem;"></i>
+                </button>
                 <img src="${imgUrl}" alt="${p.nombre}" style="width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s ease;" onerror="this.src='/static/uploads/default.png'">
                 ${isAgotado ? '<div class="letrero-agotado">AGOTADO</div>' : ''}
             </div>
@@ -400,6 +393,12 @@ function crearCardProductoHTML(p) {
                 ` : `<button class="btn btn-outline-secondary w-100 disabled rounded-pill py-2" disabled>No disponible</button>`}
             </div>
         </div>`;
+
+    col.querySelector(".btn-fav-toggle").onclick = (e) => {
+        e.preventDefault();
+        toggleFavorito(p.id_producto);
+    };
+
     return col;
 }
 
