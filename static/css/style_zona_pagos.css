@@ -198,13 +198,11 @@ html, body {
     color: var(--primary-color);
 }
 
-.footer {
+footer, .footer {
     background-color: #000;
     color: #fff;
     padding: 40px 0 20px 0;
-    border-top: 4px solid var(--primary-color);
-    flex-shrink: 0;
-    width: 100%;
+    border-top: 4px solid var(--primary);
 }
 
 @media (max-width: 768px) {
